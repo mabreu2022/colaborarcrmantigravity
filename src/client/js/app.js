@@ -1597,8 +1597,14 @@ class AppManager {
 
         if (clientData) {
             const client = JSON.parse(decodeURIComponent(clientData));
-            // DEBUG: Alert values to debug loading issue
-            alert(`DEBUG: Tipo='${client.TIPO_PESSOA}', UF='${client.UF}'`);
+
+            // FIX: Force trim and uppercase on frontend to ensure dropdowns match
+            // This handles cases where server-side trim might not have deployed yet
+            client.TIPO_PESSOA = (client.TIPO_PESSOA || '').trim().toUpperCase();
+            client.UF = (client.UF || '').trim().toUpperCase();
+
+            // DEBUG: Alert values to debug loading issue (Modified to show processed values)
+            // alert(`DEBUG PROCESSADO: Tipo='${client.TIPO_PESSOA}', UF='${client.UF}'`);
 
             title.textContent = 'Editar Cliente';
             document.getElementById('clientId').value = client.ID_CLIENTE;
