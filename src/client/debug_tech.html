@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Technicians</title>
+    <style>
+        body {
+            background: #1e1e2e;
+            color: #fff;
+            font-family: sans-serif;
+            padding: 20px;
+        }
+
+        .box {
+            border: 1px solid #444;
+            padding: 10px;
+            margin-bottom: 20px;
+            background: #2f3136;
+        }
+
+        pre {
+            background: #000;
+            padding: 10px;
+            overflow: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Debug Technicians</h1>
+
+    <div class="box">
+        <h3>1. API Response (/api/tecnicos)</h3>
+        <button onclick="checkApi()">Check API</button>
+        <div id="apiStatus">Waiting...</div>
+        <pre id="apiResult"></pre>
+    </div>
+
+    <div class="box">
+        <h3>2. Rendering Test</h3>
+        <div id="agendaTechniciansContainer" style="border: 1px solid #666; padding: 10px;">
+            Container
+        </div>
+    </div>
+
+    <script>
+        async function checkApi() {
+            const status = document.getElementById('apiStatus');
+            const result = document.getElementById('apiResult');
+            const container = document.getElementById('agendaTechniciansContainer');
+
+            status.textContent = 'Fetching...';
+            result.textContent = '';
+            container.innerHTML = 'Rendering...';
+
+            try {
+                const res = await fetch('/api/tecnicos');
+                status.textContent = `Status: ${res.status} ${res.statusText}`;
+
+                if (!res.ok) throw new Error('API failed');
+
+                const text = await res.text();
+                console.log('Raw text:', text);
+
+                try {
+                    const json = JSON.parse(text);
+                    result.textContent = JSON.stringify(json, null, 2);
+
+                    // Render Test
+                    if (Array.isArray(json)) {
+                        container.innerHTML = '';
+                        json.forEach(tech => {
+                            const div = document.createElement('div');
+                            div.style.marginBottom = '5px';
+                            div.innerHTML = `
+                                <label style="display:flex; align-items:center; cursor:pointer;">
+                                    <input type="checkbox" value="${tech.ID_TECNICO}" style="margin-right:8px;">
+                                    <span>${tech.NOME} <small>(${tech.ESPECIALIDADES || 'Geral'})</small></span>
+                                </label>
+                            `;
+                            container.appendChild(div);
+                        });
+                        if (json.length === 0) container.innerHTML = 'Array empty';
+                    } else {
+                        container.innerHTML = 'Not an array';
+                    }
+
+                } catch (e) {
+                    result.textContent = 'JSON Parse Error: ' + e.message + '\nRaw: ' + text;
+                }
+
+            } catch (e) {
+                status.textContent = 'Error: ' + e.message;
+            }
+        }
+    </script>
+</body>
+
+</html>

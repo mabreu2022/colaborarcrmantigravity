@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Colaborar CRM</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="logo-container">
+                <img src="logo.png" alt="ColaborarCRM" class="sidebar-logo">
+            </div>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="#" class="nav-item active" data-target="dashboard"><span class="icon">🏠</span>
+                            Dashboard</a></li>
+                    <li><a href="#" class="nav-item" data-target="clients"><span class="icon">👥</span> Clientes</a>
+                    </li>
+                    <li><a href="#" class="nav-item" data-target="contracts"><span class="icon">📄</span> Contratos</a>
+                    </li>
+                    <li><a href="#" class="nav-item" data-target="assets"><span class="icon">📦</span> Ativos</a></li>
+                    <li><a href="#" class="nav-item" data-target="agenda"><span class="icon">📅</span> Agenda</a></li>
+                    <li><a href="#" class="nav-item" data-target="users"><span class="icon">⚙️</span> Usuários</a></li>
+                    <li><a href="#" class="nav-item" data-target="tecnicos"><span class="icon">🔧</span> Técnicos</a>
+                    </li>
+                    <li><a href="#" class="nav-item" data-target="especialidades"><span class="icon">⭐</span>
+                            Especialidades</a></li>
+                    <li><a href="#" class="nav-item" data-target="reports"><span class="icon">📊</span> Relatórios</a>
+                    </li>
+                    <li><a href="#" class="nav-item" data-target="settings"><span class="icon">⚙️</span>
+                            Configurações</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="header-left" style="display: flex; align-items: center; gap: 15px;">
+                    <button class="toggle-btn" onclick="appManager.toggleSidebar()"
+                        style="background: none; border: none; cursor: pointer; color: var(--text-secondary);">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="3" y1="12" x2="21" y2="12"></line>
+                            <line x1="3" y1="6" x2="21" y2="6"></line>
+                            <line x1="3" y1="18" x2="21" y2="18"></line>
+                        </svg>
+                    </button>
+                    <div class="breadcrumbs">Dashboard</div>
+                </div>
+                <div class="user-profile">
+                    <span class="user-name">Admin</span>
+                    <div class="avatar">A</div>
+                    <button class="logout-btn-header" onclick="appManager.logout()" title="Sair">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <div id="content-area">
+                <!-- Dynamic Content Loads Here -->
+                <div class="dashboard-welcome">
+                    <h2>Bem vindo ao Colaborar CRM</h2>
+                    <p>Selecione uma opção no menu lateral.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Reports View -->
+    <div id="reports-view" class="view-section" style="display: none;">
+        <div class="header-actions">
+            <h2>Relatórios</h2>
+        </div>
+        <!-- ... content ... -->
+    </div>
+
+    <!-- Settings View -->
+    <div id="settings-view" class="view-section" style="display: none;">
+        <div class="header-actions">
+            <h2>Configurações do Sistema</h2>
+        </div>
+        <div class="card" style="max-width: 600px; margin-top: 20px;">
+            <h3>Personalização</h3>
+            <div class="form-group" style="margin-top: 20px;">
+                <label>Logo do Sistema (Login e Barra Lateral)</label>
+                <div style="display: flex; gap: 20px; align-items: flex-start; margin-top: 10px;">
+                    <div style="border: 1px dashed #ccc; padding: 10px; border-radius: 8px; text-align: center;">
+                        <img id="settingsCurrentLogo" src="logo.png" alt="Logo Atual"
+                            style="max-height: 80px; max-width: 150px; display: block; margin-bottom: 5px;">
+                        <small style="color: var(--text-secondary)">Atual</small>
+                    </div>
+                    <div style="flex: 1;">
+                        <input type="file" id="logoInput" accept="image/*" class="form-control"
+                            style="margin-bottom: 10px;">
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn-primary" onclick="appManager.uploadLogo()">Salvar Logo</button>
+                            <span id="uploadStatus" style="font-size: 0.9rem; align-self: center;"></span>
+                        </div>
+                        <p style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary);">
+                            Recomendado: Imagem PNG ou JPG, fundo transparente.<br>
+                            A imagem será redimensionada automaticamente na exibição.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Technicians View -->
+    <div id="tecnicos-view" class="view-section" style="display: none;">
+        <div class="header-actions">
+            <h2>Gestão de Técnicos</h2>
+            <button class="btn-primary" onclick="appManager.openTechnicianModal()">Novo Técnico</button>
+        </div>
+        <div class="card">
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Especialidades</th>
+                            <th>Email</th>
+                            <th>Telefone</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tecnicosTableBody">
+                        <!-- Loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    </div>
+
+
+
+    <!-- Report Filter Modal (Generic for now, mainly for Client Selection) -->
+    <div id="reportFilterModal" class="modal-overlay">
+        <div class="modal-window" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 id="reportModalTitle">Filtros do Relatório</h3>
+                <button class="modal-close" onclick="appManager.closeModal('reportFilterModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Selecione o Cliente</label>
+                    <select id="reportClientSelect" class="form-control">
+                        <!-- Loaded dynamically -->
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button class="btn-primary" onclick="appManager.generateReportWithFilter()">Gerar Relatório</button>
+                    <button class="btn-secondary" onclick="appManager.closeModal('reportFilterModal')">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client Modal -->
+    <div id="clientModal" class="modal-overlay">
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3 id="modalTitle">Novo Cliente</h3>
+                <button class="modal-close" onclick="appManager.closeModal('clientModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+
+                <!-- Tab Navigation -->
+                <div class="tab-nav">
+                    <button class="tab-btn active" onclick="appManager.switchClientTab('basics')">Dados Básicos</button>
+                    <button class="tab-btn" onclick="appManager.switchClientTab('contacts')">Contatos</button>
+                </div>
+
+                <!-- TAB 1: Basics -->
+                <div id="tab-client-basics" class="tab-content active">
+                    <form id="clientForm">
+                        <input type="hidden" id="clientId">
+                        <div class="form-row">
+                            <div class="form-group" style="flex:2">
+                                <label>Nome / Razão Social</label>
+                                <input type="text" id="clientName" class="form-control" required>
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>Fantasia</label>
+                                <input type="text" id="clientFantasy" class="form-control">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1">
+                                <label>Tipo</label>
+                                <select id="clientType" class="form-control">
+                                    <option value="F">Pessoa Física</option>
+                                    <option value="J">Pessoa Jurídica</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>CPF / CNPJ</label>
+                                <input type="text" id="clientCpfCnpj" class="form-control" required>
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>I.E.</label>
+                                <input type="text" id="clientIE" class="form-control">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1">
+                                <label>Telefone</label>
+                                <input type="text" id="clientPhone" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex:2">
+                                <label>Email</label>
+                                <input type="email" id="clientEmail" class="form-control">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:2">
+                                <label>Endereço</label>
+                                <input type="text" id="clientAddress" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>Número</label>
+                                <input type="text" id="clientNumber" class="form-control">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1">
+                                <label>Complemento</label>
+                                <input type="text" id="clientComplement" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>Bairro</label>
+                                <input type="text" id="clientNeighborhood" class="form-control">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1">
+                                <label>CEP</label>
+                                <input type="text" id="clientZip" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex:2">
+                                <label>Município</label>
+                                <input type="text" id="clientCity" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>UF</label>
+                                <select id="clientState" class="form-control">
+                                    <option value="">UF</option>
+                                    <option value="AC">AC</option>
+                                    <option value="AL">AL</option>
+                                    <option value="AP">AP</option>
+                                    <option value="AM">AM</option>
+                                    <option value="BA">BA</option>
+                                    <option value="CE">CE</option>
+                                    <option value="DF">DF</option>
+                                    <option value="ES">ES</option>
+                                    <option value="GO">GO</option>
+                                    <option value="MA">MA</option>
+                                    <option value="MT">MT</option>
+                                    <option value="MS">MS</option>
+                                    <option value="MG">MG</option>
+                                    <option value="PA">PA</option>
+                                    <option value="PB">PB</option>
+                                    <option value="PR">PR</option>
+                                    <option value="PE">PE</option>
+                                    <option value="PI">PI</option>
+                                    <option value="RJ">RJ</option>
+                                    <option value="RN">RN</option>
+                                    <option value="RS">RS</option>
+                                    <option value="RO">RO</option>
+                                    <option value="RR">RR</option>
+                                    <option value="SC">SC</option>
+                                    <option value="SP">SP</option>
+                                    <option value="SE">SE</option>
+                                    <option value="TO">TO</option>
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- TAB 2: Contacts -->
+                <div id="tab-client-contacts" class="tab-content">
+                    <div class="header-actions" style="margin-bottom: 15px; justify-content: space-between;">
+                        <h4>Contatos do Cliente</h4>
+                        <button type="button" class="btn-sm btn-primary" onclick="appManager.openContactModal()">+ Novo
+                            Contato</button>
+                    </div>
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Cargo</th>
+                                    <th>Telefone</th>
+                                    <th>Email</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientContactsBody">
+                                <!-- Loaded dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="appManager.closeModal('clientModal')">Cancelar</button>
+                <button class="btn-primary" onclick="appManager.saveClient()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contract Modal -->
+    <div id="contractModal" class="modal-overlay">
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3 id="contractModalTitle">Novo Contrato</h3>
+                <button class="modal-close" onclick="appManager.closeModal('contractModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="contractForm">
+                    <input type="hidden" id="contractId">
+                    <div class="form-group">
+                        <label>Cliente</label>
+                        <select id="contractClient" class="form-control" required>
+                            <option value="">Selecione...</option>
+                        </select>
+                        <input type="text" id="contractClientName" class="form-control" readonly style="display: none;">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>Data Início</label>
+                            <input type="date" id="contractStart" class="form-control" required>
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label>Data Fim</label>
+                            <input type="date" id="contractEnd" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Descrição</label>
+                        <input type="text" id="contractDesc" class="form-control">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>Valor Mensal</label>
+                            <input type="number" step="0.01" id="contractValue" class="form-control">
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label>Status</label>
+                            <select id="contractStatus" class="form-control">
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Observações</label>
+                        <textarea id="contractObs" class="form-control" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="appManager.closeModal('contractModal')">Cancelar</button>
+                <button class="btn-primary" onclick="appManager.saveContract()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Asset Modal -->
+    <div id="assetModal" class="modal-overlay" style="z-index: 1300;">
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3 id="assetModalTitle">Novo Ativo</h3>
+                <button class="modal-close" onclick="appManager.closeModal('assetModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="assetForm">
+                    <input type="hidden" id="assetId">
+                    <div class="form-group">
+                        <label>Descrição</label>
+                        <input type="text" id="assetDesc" class="form-control" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>Número de Série</label>
+                            <input type="text" id="assetSerial" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Proprietário (Cliente)</label>
+                        <select id="assetOwner" class="form-control">
+                            <option value="">Nenhum (Próprio)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="assetStatusDb" class="form-control" required>
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="appManager.closeModal('assetModal')">Cancelar</button>
+                <button class="btn-primary" onclick="appManager.saveAsset()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Modal -->
+    <div id="userModal" class="modal-overlay">
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3 id="userModalTitle">Novo Usuário</h3>
+                <button class="modal-close" onclick="appManager.closeModal('userModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <input type="hidden" id="userId">
+                    <div class="form-group">
+                        <label>Nome</label>
+                        <input type="text" id="userName" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="userEmail" class="form-control" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>Senha</label>
+                            <input type="password" id="userPassword" class="form-control"
+                                placeholder="Deixe em branco para manter">
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label>Perfil</label>
+                            <select id="userProfile" class="form-control" required>
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="appManager.closeModal('userModal')">Cancelar</button>
+            <button class="btn-primary" onclick="appManager.saveUser()">Salvar</button>
+        </div>
+    </div>
+    </div>
+
+    <!-- Agenda Modal -->
+    <div id="agendaModal" class="modal-overlay">
+        <div class="modal-window" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3 id="agendaModalTitle">Agenda</h3>
+                <button class="modal-close" onclick="appManager.closeModal('agendaModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="appManager.switchTab('tabAgendamento')">Agendamento</button>
+                    <button class="tab-btn" onclick="appManager.switchTab('tabLocados')">Locados</button>
+                </div>
+
+                <!-- Tab 1: Agendamento -->
+                <div id="tabAgendamento" class="tab-content active">
+                    <form id="agendaForm">
+                        <input type="hidden" id="agendaId">
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1">
+                                <label>Cliente</label>
+                                <select id="agendaClient" class="form-control"
+                                    onchange="appManager.onAgendaClientChange()">
+                                    <option value="">Selecione...</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>Contato</label>
+                                <select id="agendaContato" class="form-control">
+                                    <option value="">Selecione...</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1">
+                                <label>Data Retirada</label>
+                                <input type="date" id="agendaDataRetirada" class="form-control" required>
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>Horário Início</label>
+                                <input type="time" id="agendaHorarioInicio" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>Horário Fim</label>
+                                <input type="time" id="agendaHorarioFim" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>Data Devolução Prevista</label>
+                                <input type="date" id="agendaDataDevolucaoPrevista" class="form-control">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1">
+                                <label>Contrato</label>
+                                <select id="agendaContract" class="form-control"
+                                    onchange="appManager.onAgendaContractChange()">
+                                    <option value="">Selecione um Cliente primeiro...</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>Ativo (Disponível)</label>
+                                <select id="agendaAsset" class="form-control">
+                                    <option value="">Selecione...</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1">
+                                <label>Data Devolução</label>
+                                <input type="date" id="agendaDateIn" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>Status</label>
+                                <select id="agendaStatus" class="form-control">
+                                    <option value="">Selecione...</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>Quantidade</label>
+                                <input type="number" id="agendaQuantidade" class="form-control" value="1" min="1">
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>Motivo/Obs</label>
+                                <input type="text" id="agendaReason" class="form-control">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:1;">
+                                <label>Técnicos Responsáveis</label>
+                                <div class="multiselect-container" id="agendaTechniciansContainer"
+                                    style="border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; max-height: 120px; overflow-y: auto; background: var(--bg-input);">
+                                    <!-- Checkboxes will be injected here -->
+                                    <div style="color: var(--text-secondary); font-size: 0.9rem;">Aguardando JS...</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="width:100%">
+                                <label>Observações Detalhadas</label>
+                                <textarea id="agendaObsDetail" class="form-control" rows="4"></textarea>
+                            </div>
+                        </div>
+                    </form>
+                    <div style="text-align: right; margin-top: 10px;">
+                        <button class="btn-primary" onclick="appManager.saveAgenda()">Salvar Agendamento</button>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Locados (Search) -->
+                <div id="tabLocados" class="tab-content" style="display: none;">
+                    <div class="search-bar" style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <input type="text" id="locadosSearch" class="form-control" placeholder="Número de Série...">
+                        <button class="btn-secondary" onclick="appManager.searchLocados()">Pesquisar</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Série</th>
+                                    <th>Descrição</th>
+                                    <th>Cliente</th>
+                                    <th>Data Entrega</th>
+                                    <th>Data Devolução</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="locadosTableBody">
+                                <tr>
+                                    <td colspan="6" style="text-align:center">Nenhum item encontrado.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <!-- Removed standard footer since buttons are inside tabs or specific -->
+        </div>
+    </div>
+
+    <!-- Technician Modal -->
+    <div id="technicianModal" class="modal-overlay">
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3 id="technicianModalTitle">Novo Técnico</h3>
+                <button class="modal-close" onclick="appManager.closeModal('technicianModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="technicianForm">
+                    <input type="hidden" id="techId">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:2">
+                            <label>Nome Completo</label>
+                            <input type="text" id="techName" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>CPF</label>
+                            <input type="text" id="techCpf" class="form-control">
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label>Telefone</label>
+                            <input type="text" id="techPhone" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>Email</label>
+                            <input type="email" id="techEmail" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>Especialidades</label>
+                            <div class="multiselect-container" id="techSpecialtiesContainer"
+                                style="border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; max-height: 120px; overflow-y: auto; background: var(--bg-input);">
+                                <!-- Specialties Checkboxes -->
+                            </div>
+                        </div>
+                    </div>
+                </form>
+                <div style="text-align: right; margin-top: 20px;">
+                    <button class="btn-primary" onclick="appManager.saveTechnician()">Salvar Técnico</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Specialties View -->
+    <div id="especialidades-view" class="view-section" style="display: none;">
+        <div class="header-actions">
+            <h2>Gestão de Especialidades</h2>
+            <button class="btn-primary" onclick="appManager.openSpecialtyModal()">Nova Especialidade</button>
+        </div>
+        <div class="card">
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nome</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="especialidadesTableBody">
+                        <!-- Loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Specialty Modal -->
+    <div id="specialtyModal" class="modal-overlay">
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3 id="specialtyModalTitle">Nova Especialidade</h3>
+                <button class="modal-close" onclick="appManager.closeModal('specialtyModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="specialtyForm">
+                    <input type="hidden" id="specId">
+                    <div class="form-group">
+                        <label>Nome da Especialidade</label>
+                        <input type="text" id="specName" class="form-control" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="appManager.closeModal('specialtyModal')">Cancelar</button>
+                <button class="btn-primary" onclick="appManager.saveSpecialty()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contact Modal (Stacked on Client Modal) -->
+    <div id="contactModal" class="modal-overlay" style="z-index: 1100;">
+        <div class="modal-window" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 id="contactModalTitle">Novo Contato</h3>
+                <button class="modal-close" onclick="appManager.closeModal('contactModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="contactForm">
+                    <input type="hidden" id="contactId">
+                    <input type="hidden" id="contactClientId">
+
+                    <div class="form-group">
+                        <label>Nome do Contato</label>
+                        <input type="text" id="contactName" class="form-control" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>Telefone</label>
+                            <input type="text" id="contactPhone" class="form-control">
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label>Tipo</label>
+                            <select id="contactType" class="form-control">
+                                <option value="Comercial">Comercial</option>
+                                <option value="Financeiro">Financeiro</option>
+                                <option value="Técnico">Técnico</option>
+                                <option value="Outro">Outro</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="contactEmail" class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Cargo</label>
+                        <input type="text" id="contactRole" class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Observação</label>
+                        <textarea id="contactObs" class="form-control" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="appManager.closeModal('contactModal')">Cancelar</button>
+                <button class="btn-primary" onclick="appManager.saveContact()">Salvar Contato</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Detail Modal -->
+    <div id="dashboardDetailModal" class="modal-overlay" style="z-index: 1200;">
+        <div class="modal-window" style="width: 800px; max-width: 95%;">
+            <div class="modal-header">
+                <h3 id="detailModalTitle">Detalhes</h3>
+                <button class="modal-close" onclick="appManager.closeModal('dashboardDetailModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="data-table" id="detailModalTable">
+                        <thead id="detailModalThead"></thead>
+                        <tbody id="detailModalTbody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="appManager.closeModal('dashboardDetailModal')">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/app.js?v=10"></script>
+</body>
+
+</html>
