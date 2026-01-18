@@ -1603,9 +1603,6 @@ class AppManager {
             client.TIPO_PESSOA = (client.TIPO_PESSOA || '').trim().toUpperCase();
             client.UF = (client.UF || '').trim().toUpperCase();
 
-            // DEBUG: Alert values to debug loading issue (Modified to show processed values)
-            // alert(`DEBUG PROCESSADO: Tipo='${client.TIPO_PESSOA}', UF='${client.UF}'`);
-
             title.textContent = 'Editar Cliente';
             document.getElementById('clientId').value = client.ID_CLIENTE;
             document.getElementById('clientName').value = client.NOME_RAZAO;

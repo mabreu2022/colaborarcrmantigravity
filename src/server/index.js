@@ -150,19 +150,6 @@ app.get('/api/clientes', async (req, res) => {
     }
 });
 
-// Helper to sanitize and clean data
-const sanitize = (val) => (val === '' || val === undefined) ? null : val;
-const cleanDigits = (val) => val ? val.replace(/\D/g, '') : null;
-
-app.get('/api/debug/clientes', async (req, res) => {
-    try {
-        const result = await db.query('SELECT FIRST 1 * FROM CLIENTES');
-        res.json({ keys: result.length > 0 ? Object.keys(result[0]) : [], row: result[0] });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
 app.post('/api/clientes', async (req, res) => {
     let { NOME_RAZAO, NOME_FANTASIA, CPF_CNPJ, IE, EMAIL, TELEFONE, ENDERECO, NUMERO, COMPLEMENTO, BAIRRO, CEP, MUNICIPIO, UF, TIPO_PESSOA, CODIGO_PAIS } = req.body;
 
