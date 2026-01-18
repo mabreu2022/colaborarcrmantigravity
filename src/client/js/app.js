@@ -1007,7 +1007,7 @@ class AppManager {
         contentArea.innerHTML = '<div class="loading">Carregando clientes...</div>';
 
         try {
-            const response = await fetch('api/clientes');
+            const response = await fetch(`api/clientes?t=${Date.now()}`);
             if (!response.ok) throw new Error('Erro ao carregar clientes');
 
             this.clientsList = await response.json(); // Use clientsList for the grid to distinguish from shared clientsData if needed, though they are usually same.
@@ -1597,6 +1597,9 @@ class AppManager {
 
         if (clientData) {
             const client = JSON.parse(decodeURIComponent(clientData));
+            // DEBUG: Alert values to debug loading issue
+            alert(`DEBUG: Tipo='${client.TIPO_PESSOA}', UF='${client.UF}'`);
+
             title.textContent = 'Editar Cliente';
             document.getElementById('clientId').value = client.ID_CLIENTE;
             document.getElementById('clientName').value = client.NOME_RAZAO;
