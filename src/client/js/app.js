@@ -1624,18 +1624,22 @@ class AppManager {
     }
 
     switchClientTab(tabName) {
-        const tabs = document.querySelectorAll('.tab-btn');
-        const contents = document.querySelectorAll('.tab-content');
+        // Updated logic to use IDs directly for stability
+        const tabBasics = document.getElementById('tab-client-basics');
+        const tabContacts = document.getElementById('tab-client-contacts');
+        const buttons = document.querySelectorAll('.tab-nav .tab-btn');
 
-        tabs.forEach(t => t.classList.remove('active'));
-        contents.forEach(c => c.classList.remove('active'));
+        // Hide all
+        tabBasics.classList.remove('active');
+        tabContacts.classList.remove('active');
+        buttons.forEach(b => b.classList.remove('active'));
 
         if (tabName === 'basics') {
-            tabs[0].classList.add('active');
-            document.getElementById('tab-client-basics').classList.add('active');
+            tabBasics.classList.add('active');
+            buttons[0].classList.add('active'); // First button is Basics
         } else {
-            tabs[1].classList.add('active');
-            document.getElementById('tab-client-contacts').classList.add('active');
+            tabContacts.classList.add('active');
+            buttons[1].classList.add('active'); // Second button is Contacts
         }
     }
 
@@ -2064,6 +2068,7 @@ class AppManager {
             CEP: document.getElementById('clientZip').value,
             MUNICIPIO: document.getElementById('clientCity').value,
             UF: document.getElementById('clientState').value,
+            CODIGO_PAIS: 1058, // Default Brazil
         };
 
         if (!data.NOME_RAZAO || !data.CPF_CNPJ) {

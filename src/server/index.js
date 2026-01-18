@@ -138,28 +138,49 @@ app.get('/api/health', async (req, res) => {
 app.get('/api/clientes', async (req, res) => {
     try {
         const result = await db.query('SELECT FIRST 50 * FROM CLIENTES ORDER BY NOME_RAZAO');
-        res.json(result);
+        // Trim and Uppercase CHAR fields for the frontend
+        const trimmedResult = result.map(c => ({
+            ...c,
+            TIPO_PESSOA: c.TIPO_PESSOA ? c.TIPO_PESSOA.trim().toUpperCase() : null,
+            UF: c.UF ? c.UF.trim().toUpperCase() : null
+        }));
+        res.json(trimmedResult);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Helper to sanitize and clean data
+const sanitize = (val) => (val === '' || val === undefined) ? null : val;
+const cleanDigits = (val) => val ? val.replace(/\D/g, '') : null;
+
+app.get('/api/debug/clientes', async (req, res) => {
+    try {
+        const result = await db.query('SELECT FIRST 1 * FROM CLIENTES');
+        res.json({ keys: result.length > 0 ? Object.keys(result[0]) : [], row: result[0] });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
 app.post('/api/clientes', async (req, res) => {
-    let { NOME_RAZAO, NOME_FANTASIA, CPF_CNPJ, IE, EMAIL, TELEFONE, ENDERECO, NUMERO, COMPLEMENTO, BAIRRO, CEP, MUNICIPIO, UF, TIPO_PESSOA } = req.body;
-
-    // Helper to sanitize empty strings to null
-    const sanitize = (val) => (val === '' || val === undefined) ? null : val;
+    let { NOME_RAZAO, NOME_FANTASIA, CPF_CNPJ, IE, EMAIL, TELEFONE, ENDERECO, NUMERO, COMPLEMENTO, BAIRRO, CEP, MUNICIPIO, UF, TIPO_PESSOA, CODIGO_PAIS } = req.body;
 
     try {
         const query = `
-            INSERT INTO CLIENTES (NOME_RAZAO, NOME_FANTASIA, CPF_CNPJ, IE, EMAIL, TELEFONE, ENDERECO, NUMERO, COMPLEMENTO, BAIRRO, CEP, MUNICIPIO, UF, TIPO_PESSOA, ATIVO)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'S')
+            INSERT INTO CLIENTES (
+                NOME_RAZAO, NOME_FANTASIA, CPF_CNPJ, IE, EMAIL, TELEFONE, 
+                ENDERECO, NUMERO, COMPLEMENTO, BAIRRO, CEP, MUNICIPIO, UF, 
+                TIPO_PESSOA, CODIGO_PAIS, DATA_MODIFICACAO, ATIVO
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'S')
             RETURNING ID_CLIENTE
         `;
         const result = await db.query(query, [
-            sanitize(NOME_RAZAO), sanitize(NOME_FANTASIA), sanitize(CPF_CNPJ), sanitize(IE), sanitize(EMAIL), sanitize(TELEFONE),
-            sanitize(ENDERECO), sanitize(NUMERO), sanitize(COMPLEMENTO), sanitize(BAIRRO), sanitize(CEP), sanitize(MUNICIPIO), sanitize(UF),
-            sanitize(TIPO_PESSOA) || 'F' // Default to F if null
+            sanitize(NOME_RAZAO), sanitize(NOME_FANTASIA), cleanDigits(CPF_CNPJ), sanitize(IE), sanitize(EMAIL), cleanDigits(TELEFONE),
+            sanitize(ENDERECO), sanitize(NUMERO), sanitize(COMPLEMENTO), sanitize(BAIRRO), cleanDigits(CEP), sanitize(MUNICIPIO), sanitize(UF),
+            sanitize(TIPO_PESSOA) || 'F',
+            sanitize(CODIGO_PAIS) || 1058 // Default Brazil if missing
         ]);
         res.json({ success: true, id: result.ID_CLIENTE });
     } catch (error) {
@@ -170,25 +191,24 @@ app.post('/api/clientes', async (req, res) => {
 
 app.put('/api/clientes/:id', async (req, res) => {
     const { id } = req.params;
-    let { NOME_RAZAO, NOME_FANTASIA, CPF_CNPJ, IE, EMAIL, TELEFONE, ENDERECO, NUMERO, COMPLEMENTO, BAIRRO, CEP, MUNICIPIO, UF, TIPO_PESSOA } = req.body;
+    let { NOME_RAZAO, NOME_FANTASIA, CPF_CNPJ, IE, EMAIL, TELEFONE, ENDERECO, NUMERO, COMPLEMENTO, BAIRRO, CEP, MUNICIPIO, UF, TIPO_PESSOA, CODIGO_PAIS } = req.body;
 
     console.log(`PUT /api/clientes/${id} Payload:`, req.body); // Debug
-
-    // Helper to sanitize empty strings to null
-    const sanitize = (val) => (val === '' || val === undefined) ? null : val;
 
     try {
         const query = `
             UPDATE CLIENTES 
             SET NOME_RAZAO=?, NOME_FANTASIA=?, CPF_CNPJ=?, IE=?, EMAIL=?, TELEFONE=?, 
-                ENDERECO=?, NUMERO=?, COMPLEMENTO=?, BAIRRO=?, CEP=?, MUNICIPIO=?, UF=?, TIPO_PESSOA=?
+                ENDERECO=?, NUMERO=?, COMPLEMENTO=?, BAIRRO=?, CEP=?, MUNICIPIO=?, UF=?, 
+                TIPO_PESSOA=?, CODIGO_PAIS=?, DATA_MODIFICACAO=CURRENT_TIMESTAMP
             WHERE ID_CLIENTE = ?
         `;
 
         // Sanitize all inputs
         await db.query(query, [
-            sanitize(NOME_RAZAO), sanitize(NOME_FANTASIA), sanitize(CPF_CNPJ), sanitize(IE), sanitize(EMAIL), sanitize(TELEFONE),
-            sanitize(ENDERECO), sanitize(NUMERO), sanitize(COMPLEMENTO), sanitize(BAIRRO), sanitize(CEP), sanitize(MUNICIPIO), sanitize(UF), sanitize(TIPO_PESSOA),
+            sanitize(NOME_RAZAO), sanitize(NOME_FANTASIA), cleanDigits(CPF_CNPJ), sanitize(IE), sanitize(EMAIL), cleanDigits(TELEFONE),
+            sanitize(ENDERECO), sanitize(NUMERO), sanitize(COMPLEMENTO), sanitize(BAIRRO), cleanDigits(CEP), sanitize(MUNICIPIO), sanitize(UF),
+            sanitize(TIPO_PESSOA), sanitize(CODIGO_PAIS) || 1058,
             id
         ]);
         res.json({ success: true });
