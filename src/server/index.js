@@ -10,6 +10,17 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Swagger Documentation
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./swagger');
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.get('/api-docs.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(swaggerSpec);
+});
+
+
 // Request Logger Middleware
 app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
@@ -126,7 +137,20 @@ app.get('/api/config/fs', (req, res) => {
 
 
 // API Routes
+/**
+ * @openapi
+ * /api/health:
+ *   get:
+ *     summary: Health Check
+ *     description: Returns the status of the server and database connection.
+ *     responses:
+ *       200:
+ *         description: Server is up and connected to DB.
+ *       500:
+ *         description: Database connection error.
+ */
 app.get('/api/health', async (req, res) => {
+
     try {
         await db.testConnection();
         res.json({ status: 'ok', message: 'Connected to Database' });
@@ -135,7 +159,24 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/clientes:
+ *   get:
+ *     summary: List Clients
+ *     description: Returns the first 50 clients ordered by name.
+ *     responses:
+ *       200:
+ *         description: A list of clients.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Cliente'
+ */
 app.get('/api/clientes', async (req, res) => {
+
     try {
         const result = await db.query('SELECT FIRST 50 * FROM CLIENTES ORDER BY NOME_RAZAO');
         // Trim and Uppercase CHAR fields for the frontend
@@ -150,7 +191,24 @@ app.get('/api/clientes', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/clientes:
+ *   post:
+ *     summary: Create Client
+ *     description: Adds a new client to the database.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Cliente'
+ *     responses:
+ *       200:
+ *         description: Client created successfully.
+ */
 app.post('/api/clientes', async (req, res) => {
+
     let { NOME_RAZAO, NOME_FANTASIA, CPF_CNPJ, IE, EMAIL, TELEFONE, ENDERECO, NUMERO, COMPLEMENTO, BAIRRO, CEP, MUNICIPIO, UF, TIPO_PESSOA, CODIGO_PAIS } = req.body;
 
     try {
@@ -176,7 +234,30 @@ app.post('/api/clientes', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/clientes/{id}:
+ *   put:
+ *     summary: Update Client
+ *     description: Updates an existing client's details.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Cliente'
+ *     responses:
+ *       200:
+ *         description: Client updated successfully.
+ */
 app.put('/api/clientes/:id', async (req, res) => {
+
     const { id } = req.params;
     let { NOME_RAZAO, NOME_FANTASIA, CPF_CNPJ, IE, EMAIL, TELEFONE, ENDERECO, NUMERO, COMPLEMENTO, BAIRRO, CEP, MUNICIPIO, UF, TIPO_PESSOA, CODIGO_PAIS } = req.body;
 
@@ -205,7 +286,24 @@ app.put('/api/clientes/:id', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/clientes/{id}:
+ *   delete:
+ *     summary: Delete Client
+ *     description: Removes a client from the database.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Client deleted successfully.
+ */
 app.delete('/api/clientes/:id', async (req, res) => {
+
     const { id } = req.params;
     try {
         await db.query('DELETE FROM CLIENTES WHERE ID_CLIENTE = ?', [id]);
@@ -218,7 +316,33 @@ app.delete('/api/clientes/:id', async (req, res) => {
 
 // --- CONTATOS ROUTES ---
 
+/**
+ * @openapi
+ * /api/contatos:
+ *   get:
+ *     summary: List All Contacts
+ *     description: Returns all contacts in the CRM.
+ *     responses:
+ *       200:
+ *         description: A list of contacts.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Contato'
+ */
+app.get('/api/contatos', async (req, res) => {
+    try {
+        const result = await db.query('SELECT * FROM CONTATOS ORDER BY NOME_CONTATO');
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.get('/api/clientes/:id/contatos', async (req, res) => {
+
     try {
         const { id } = req.params;
         const result = await db.query('SELECT * FROM CONTATOS WHERE ID_CLIENTE = ? ORDER BY NOME_CONTATO', [id]);
@@ -228,7 +352,24 @@ app.get('/api/clientes/:id/contatos', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/contatos:
+ *   post:
+ *     summary: Create Contact
+ *     description: Adds a new contact for a client.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Contato'
+ *     responses:
+ *       200:
+ *         description: Contact created successfully.
+ */
 app.post('/api/contatos', async (req, res) => {
+
     const { ID_CLIENTE, NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO } = req.body;
     try {
         const query = `
@@ -244,7 +385,30 @@ app.post('/api/contatos', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/contatos/{id}:
+ *   put:
+ *     summary: Update Contact
+ *     description: Updates an existing contact's details.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Contato'
+ *     responses:
+ *       200:
+ *         description: Contact updated successfully.
+ */
 app.put('/api/contatos/:id', async (req, res) => {
+
     const { id } = req.params;
     const { NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO } = req.body;
     try {
@@ -260,7 +424,24 @@ app.put('/api/contatos/:id', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/contatos/{id}:
+ *   delete:
+ *     summary: Delete Contact
+ *     description: Removes a contact from the database.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Contact deleted successfully.
+ */
 app.delete('/api/contatos/:id', async (req, res) => {
+
     try {
         const { id } = req.params;
         await db.query('DELETE FROM CONTATOS WHERE ID_CONTATO = ?', [id]);
@@ -280,7 +461,24 @@ app.get('/api/status_contratos', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/contratos:
+ *   get:
+ *     summary: List Contracts
+ *     description: Returns all contracts with client and status details.
+ *     responses:
+ *       200:
+ *         description: A list of contracts.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Contrato'
+ */
 app.get('/api/contratos', async (req, res) => {
+
     try {
         const query = `
             SELECT 
@@ -333,7 +531,24 @@ app.get('/api/contratos', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/contratos:
+ *   post:
+ *     summary: Create Contract
+ *     description: Adds a new contract to the database.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Contrato'
+ *     responses:
+ *       200:
+ *         description: Contract created successfully.
+ */
 app.post('/api/contratos', async (req, res) => {
+
     const { ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, DESCRICAO, OBSERVACOES } = req.body;
     console.log("POST /api/contratos Payload:", req.body); // Debug Log
     try {
@@ -351,7 +566,30 @@ app.post('/api/contratos', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/contratos/{id}:
+ *   put:
+ *     summary: Update Contract
+ *     description: Updates an existing contract's details.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Contrato'
+ *     responses:
+ *       200:
+ *         description: Contract updated successfully.
+ */
 app.put('/api/contratos/:id', async (req, res) => {
+
     const { id } = req.params;
     const { ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, DESCRICAO, OBSERVACOES } = req.body;
     try {
@@ -367,7 +605,24 @@ app.put('/api/contratos/:id', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/contratos/{id}:
+ *   delete:
+ *     summary: Delete Contract
+ *     description: Removes a contract from the database.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Contract deleted successfully.
+ */
 app.delete('/api/contratos/:id', async (req, res) => {
+
     const { id } = req.params;
     try {
         await db.query('DELETE FROM CONTRATOS WHERE ID_CONTRATO = ?', [id]);
@@ -377,7 +632,24 @@ app.delete('/api/contratos/:id', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/status:
+ *   get:
+ *     summary: List Asset Statuses
+ *     description: Returns all possible statuses for assets.
+ *     responses:
+ *       200:
+ *         description: A list of status codes and names.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Status'
+ */
 app.get('/api/status', async (req, res) => {
+
     try {
         const result = await db.query('SELECT * FROM "STATUS"');
         res.json(result);
@@ -386,9 +658,105 @@ app.get('/api/status', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/status:
+ *   post:
+ *     summary: Create Asset Status
+ *     description: Adds a new asset status code.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Status'
+ *     responses:
+ *       200:
+ *         description: Status created successfully.
+ */
+app.post('/api/status', async (req, res) => {
+    const { STATUS } = req.body;
+    try {
+        const result = await db.query('INSERT INTO "STATUS" (STATUS) VALUES (?) RETURNING ID_STATUS', [STATUS]);
+        res.json({ success: true, id: result.ID_STATUS });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/**
+ * @openapi
+ * /api/status/{id}:
+ *   put:
+ *     summary: Update Asset Status
+ *     description: Updates an existing asset status name.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Status'
+ *     responses:
+ *       200:
+ *         description: Status updated successfully.
+ */
+app.put('/api/status/:id', async (req, res) => {
+    const { id } = req.params;
+    const { STATUS } = req.body;
+    try {
+        await db.query('UPDATE "STATUS" SET STATUS=? WHERE ID_STATUS=?', [STATUS, id]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/**
+ * @openapi
+ * /api/status/{id}:
+ *   delete:
+ *     summary: Delete Asset Status
+ *     description: Removes a status code from the database.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Status deleted successfully.
+ */
+app.delete('/api/status/:id', async (req, res) => {
+    try {
+        await db.query('DELETE FROM "STATUS" WHERE ID_STATUS=?', [req.params.id]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+
 // ... Assets ...
 
+/**
+ * @openapi
+ * /api/ativos:
+ *   get:
+ *     summary: List Assets
+ *     description: Returns all assets with owner and status details.
+ *     responses:
+ *       200:
+ *         description: A list of assets.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Ativo'
+ */
 app.get('/api/ativos', async (req, res) => {
+
     try {
         const query = `
             SELECT 
@@ -410,7 +778,24 @@ app.get('/api/ativos', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/ativos:
+ *   post:
+ *     summary: Create Asset
+ *     description: Adds a new asset to the database.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Ativo'
+ *     responses:
+ *       200:
+ *         description: Asset created successfully.
+ */
 app.post('/api/ativos', async (req, res) => {
+
     const { DESCRICAO, NUMERO_SERIE, ID_STATUS, ID_CLIENTE_PROPRIETARIO } = req.body;
     try {
         const query = `
@@ -425,7 +810,30 @@ app.post('/api/ativos', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/ativos/{id}:
+ *   put:
+ *     summary: Update Asset
+ *     description: Updates an existing asset's details.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Ativo'
+ *     responses:
+ *       200:
+ *         description: Asset updated successfully.
+ */
 app.put('/api/ativos/:id', async (req, res) => {
+
     const { id } = req.params;
     const { DESCRICAO, NUMERO_SERIE, ID_STATUS, ID_CLIENTE_PROPRIETARIO } = req.body;
     try {
@@ -437,7 +845,24 @@ app.put('/api/ativos/:id', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/ativos/{id}:
+ *   delete:
+ *     summary: Delete Asset
+ *     description: Removes an asset from the database.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Asset deleted successfully.
+ */
 app.delete('/api/ativos/:id', async (req, res) => {
+
     try {
         await db.query('DELETE FROM ATIVOS WHERE ID_ATIVO = ?', [req.params.id]);
         res.json({ success: true });
@@ -452,6 +877,92 @@ app.get('/api/perfis', async (req, res) => {
     try { res.json(await db.query('SELECT * FROM PERFIS')); }
     catch (e) { res.status(500).json({ error: e.message }); }
 });
+
+/**
+ * @openapi
+ * /api/perfis:
+ *   post:
+ *     summary: Create Profile
+ *     description: Adds a new user profile.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               NOME: { type: 'string' }
+ *     responses:
+ *       200:
+ *         description: Profile created successfully.
+ */
+app.post('/api/perfis', async (req, res) => {
+
+    const { NOME } = req.body;
+    try {
+        const result = await db.query('INSERT INTO PERFIS (NOME) VALUES (?) RETURNING ID_PERFIL', [NOME]);
+        res.json({ success: true, id: result.ID_PERFIL });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/**
+ * @openapi
+ * /api/perfis/{id}:
+ *   put:
+ *     summary: Update Profile
+ *     description: Updates an existing user profile.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               NOME: { type: 'string' }
+ *     responses:
+ *       200:
+ *         description: Profile updated successfully.
+ */
+app.put('/api/perfis/:id', async (req, res) => {
+
+    const { id } = req.params;
+    const { NOME } = req.body;
+    try {
+        await db.query('UPDATE PERFIS SET NOME=? WHERE ID_PERFIL=?', [NOME, id]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/**
+ * @openapi
+ * /api/perfis/{id}:
+ *   delete:
+ *     summary: Delete Profile
+ *     description: Removes a user profile from the database.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Profile deleted successfully.
+ */
+app.delete('/api/perfis/:id', async (req, res) => {
+
+    try {
+        await db.query('DELETE FROM PERFIS WHERE ID_PERFIL=?', [req.params.id]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 
 app.get('/api/usuarios', async (req, res) => {
     try {
@@ -820,7 +1331,24 @@ app.put('/api/agendamentos/:id', async (req, res) => {
 
 // 5. Technicians & Specialties
 
+/**
+ * @openapi
+ * /api/tecnicos:
+ *   get:
+ *     summary: List Technicians
+ *     description: Returns all technicians with their specialties.
+ *     responses:
+ *       200:
+ *         description: A list of technicians.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Tecnico'
+ */
 app.get('/api/tecnicos', async (req, res) => {
+
     try {
         const query = `
                 SELECT T.*, 
@@ -876,7 +1404,24 @@ app.get('/api/tecnicos', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+/**
+ * @openapi
+ * /api/tecnicos:
+ *   post:
+ *     summary: Create Technician
+ *     description: Adds a new technician and their specialties.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Tecnico'
+ *     responses:
+ *       200:
+ *         description: Technician created successfully.
+ */
 app.post('/api/tecnicos', async (req, res) => {
+
     const { NOME, CPF, EMAIL, TELEFONE, especialidades } = req.body;
     console.log("POST /api/tecnicos", req.body); // Debug
     try {
@@ -900,7 +1445,30 @@ app.post('/api/tecnicos', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/tecnicos/{id}:
+ *   put:
+ *     summary: Update Technician
+ *     description: Updates an existing technician's details and specialties.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Tecnico'
+ *     responses:
+ *       200:
+ *         description: Technician updated successfully.
+ */
 app.put('/api/tecnicos/:id', async (req, res) => {
+
     const { id } = req.params;
     const { NOME, CPF, EMAIL, TELEFONE, especialidades } = req.body;
     console.log(`PUT /api/tecnicos/${id}`, req.body); // Debug
@@ -928,7 +1496,24 @@ app.put('/api/tecnicos/:id', async (req, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /api/tecnicos/{id}:
+ *   delete:
+ *     summary: Delete Technician
+ *     description: Removes a technician from the database.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Technician deleted successfully.
+ */
 app.delete('/api/tecnicos/:id', async (req, res) => {
+
     const { id } = req.params;
     try {
         await db.query('DELETE FROM TECNICOS WHERE ID_TECNICO=?', [id]);
@@ -936,12 +1521,46 @@ app.delete('/api/tecnicos/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+/**
+ * @openapi
+ * /api/especialidades:
+ *   get:
+ *     summary: List Specialties
+ *     description: Returns all technician specialties.
+ *     responses:
+ *       200:
+ *         description: A list of specialties.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Especialidade'
+ */
 app.get('/api/especialidades', async (req, res) => {
+
     try { res.json(await db.query('SELECT * FROM ESPECIALIDADES')); }
     catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+/**
+ * @openapi
+ * /api/especialidades:
+ *   post:
+ *     summary: Create Specialty
+ *     description: Adds a new technician specialty.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Especialidade'
+ *     responses:
+ *       200:
+ *         description: Specialty created successfully.
+ */
 app.post('/api/especialidades', async (req, res) => {
+
     const { NOME } = req.body;
     try {
         const result = await db.query('INSERT INTO ESPECIALIDADES (NOME) VALUES (?) RETURNING ID_ESPECIALIDADE', [NOME]);
@@ -949,7 +1568,30 @@ app.post('/api/especialidades', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+/**
+ * @openapi
+ * /api/especialidades/{id}:
+ *   put:
+ *     summary: Update Specialty
+ *     description: Updates an existing specialty.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Especialidade'
+ *     responses:
+ *       200:
+ *         description: Specialty updated successfully.
+ */
 app.put('/api/especialidades/:id', async (req, res) => {
+
     const { id } = req.params;
     const { NOME } = req.body;
     try {
@@ -958,7 +1600,24 @@ app.put('/api/especialidades/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+/**
+ * @openapi
+ * /api/especialidades/{id}:
+ *   delete:
+ *     summary: Delete Specialty
+ *     description: Removes a specialty from the database.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Specialty deleted successfully.
+ */
 app.delete('/api/especialidades/:id', async (req, res) => {
+
     const { id } = req.params;
     try {
         await db.query('DELETE FROM ESPECIALIDADES WHERE ID_ESPECIALIDADE=?', [id]);
@@ -966,17 +1625,277 @@ app.delete('/api/especialidades/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+/**
+ * @openapi
+ * /api/agendamentos/{id}:
+ *   delete:
+ *     summary: Delete Appointment
+ *     description: Removes an appointment from the database.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Appointment deleted successfully.
+ */
 app.delete('/api/agendamentos/:id', async (req, res) => {
+
     try {
         await db.query('DELETE FROM AGENDA WHERE ID_AGENDA = ?', [req.params.id]);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+/**
+ * @openapi
+ * /api/pagamentos:
+ *   get:
+ *     summary: List Payments
+ *     description: Returns all payments from the database.
+ *     responses:
+ *       200:
+ *         description: A list of payments.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Pagamento'
+ */
+app.get('/api/pagamentos', async (req, res) => {
+    try { res.json(await db.query('SELECT * FROM PAGAMENTOS')); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/**
+ * @openapi
+ * /api/pagamentos:
+ *   post:
+ *     summary: Create Payment
+ *     description: Adds a new payment record.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Pagamento'
+ *     responses:
+ *       200:
+ *         description: Payment created successfully.
+ */
+app.post('/api/pagamentos', async (req, res) => {
+    const { ID_CONTRATO, DATA_VENCIMENTO, DATA_PAGAMENTO, VALOR_PAGO, STATUS_PAGAMENTO } = req.body;
+    try {
+        const query = `INSERT INTO PAGAMENTOS (ID_CONTRATO, DATA_VENCIMENTO, DATA_PAGAMENTO, VALOR_PAGO, STATUS_PAGAMENTO) VALUES (?, ?, ?, ?, ?) RETURNING ID_PAGAMENTO`;
+        const result = await db.query(query, [ID_CONTRATO, DATA_VENCIMENTO, DATA_PAGAMENTO, VALOR_PAGO, STATUS_PAGAMENTO]);
+        res.json({ success: true, id: result.ID_PAGAMENTO });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/**
+ * @openapi
+ * /api/pagamentos/{id}:
+ *   put:
+ *     summary: Update Payment
+ *     description: Updates an existing payment record.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Pagamento'
+ *     responses:
+ *       200:
+ *         description: Payment updated successfully.
+ */
+app.put('/api/pagamentos/:id', async (req, res) => {
+    const { id } = req.params;
+    const { ID_CONTRATO, DATA_VENCIMENTO, DATA_PAGAMENTO, VALOR_PAGO, STATUS_PAGAMENTO } = req.body;
+    try {
+        const query = `UPDATE PAGAMENTOS SET ID_CONTRATO=?, DATA_VENCIMENTO=?, DATA_PAGAMENTO=?, VALOR_PAGO=?, STATUS_PAGAMENTO=? WHERE ID_PAGAMENTO=?`;
+        await db.query(query, [ID_CONTRATO, DATA_VENCIMENTO, DATA_PAGAMENTO, VALOR_PAGO, STATUS_PAGAMENTO, id]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/**
+ * @openapi
+ * /api/pagamentos/{id}:
+ *   delete:
+ *     summary: Delete Payment
+ *     description: Removes a payment record from the database.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Payment deleted successfully.
+ */
+app.delete('/api/pagamentos/:id', async (req, res) => {
+    try {
+        await db.query('DELETE FROM PAGAMENTOS WHERE ID_PAGAMENTO=?', [req.params.id]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/**
+ * @openapi
+ * /api/auditoria:
+ *   get:
+ *     summary: List Audit Logs
+ *     description: Returns the CRM audit logs.
+ *     responses:
+ *       200:
+ *         description: A list of audit logs.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Auditoria'
+ */
+app.get('/api/auditoria', async (req, res) => {
+    try { res.json(await db.query('SELECT FIRST 100 * FROM AUDITORIA ORDER BY DATA_HORA DESC')); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/**
+ * @openapi
+ * /api/permissoes:
+ *   get:
+ *     summary: List Permissions
+ *     description: Returns all screen permissions for profiles.
+ *     responses:
+ *       200:
+ *         description: A list of permissions.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Permissao'
+ */
+app.get('/api/permissoes', async (req, res) => {
+    try { res.json(await db.query('SELECT * FROM PERMISSOES')); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/**
+ * @openapi
+ * /api/permissoes:
+ *   post:
+ *     summary: Create Permission
+ *     description: Adds a new screen permission for a profile.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Permissao'
+ *     responses:
+ *       200:
+ *         description: Permission created successfully.
+ */
+app.post('/api/permissoes', async (req, res) => {
+
+    const { ID_PERFIL, ID_SCREEN, CAN_VIEW, CAN_EDIT, CAN_DELETE } = req.body;
+    try {
+        await db.query('INSERT INTO PERMISSOES (ID_PERFIL, ID_SCREEN, CAN_VIEW, CAN_EDIT, CAN_DELETE) VALUES (?, ?, ?, ?, ?)', [ID_PERFIL, ID_SCREEN, CAN_VIEW, CAN_EDIT, CAN_DELETE]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/**
+ * @openapi
+ * /api/permissoes:
+ *   delete:
+ *     summary: Delete Permission
+ *     description: Removes a screen permission.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ID_PERFIL: { type: 'integer' }
+ *               ID_SCREEN: { type: 'integer' }
+ *     responses:
+ *       200:
+ *         description: Permission deleted successfully.
+ */
+app.delete('/api/permissoes', async (req, res) => {
+
+    const { ID_PERFIL, ID_SCREEN } = req.body;
+    try {
+        await db.query('DELETE FROM PERMISSOES WHERE ID_PERFIL=? AND ID_SCREEN=?', [ID_PERFIL, ID_SCREEN]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+
+/**
+ * @openapi
+ * /api/acoes:
+ *   get:
+ *     summary: List Actions
+ *     description: Returns all audit actions.
+ *     responses:
+ *       200:
+ *         description: A list of actions.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Acao'
+ */
+app.get('/api/acoes', async (req, res) => {
+    try { res.json(await db.query('SELECT * FROM ACOES')); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/acoes', async (req, res) => {
+    const { NOME, DESCRICAO } = req.body;
+    try {
+        const result = await db.query('INSERT INTO ACOES (NOME, DESCRICAO) VALUES (?, ?) RETURNING ID_ACAO', [NOME, DESCRICAO]);
+        res.json({ success: true, id: result.ID_ACAO });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/acoes/:id', async (req, res) => {
+    const { id } = req.params;
+    const { NOME, DESCRICAO } = req.body;
+    try {
+        await db.query('UPDATE ACOES SET NOME=?, DESCRICAO=? WHERE ID_ACAO=?', [NOME, DESCRICAO, id]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/acoes/:id', async (req, res) => {
+    try {
+        await db.query('DELETE FROM ACOES WHERE ID_ACAO=?', [req.params.id]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+
 
 // Start Server
-app.listen(port, async () => {
-    console.log(`Server running at http://localhost:${port}`);
+app.listen(port, '0.0.0.0', async () => {
+    console.log(`Server running at http://0.0.0.0:${port}`);
     try {
         await db.testConnection();
     } catch (err) {

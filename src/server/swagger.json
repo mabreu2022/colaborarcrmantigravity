@@ -1,0 +1,1262 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Colaborar CRM API",
+    "version": "1.0.0",
+    "description": "API documentation for Colaborar CRM. Integrates with Clawdbot.",
+    "contact": {
+      "name": "Developer"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://179.0.178.186:3011",
+      "description": "VPS Server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Cliente": {
+        "type": "object",
+        "properties": {
+          "ID_CLIENTE": {
+            "type": "integer"
+          },
+          "NOME_RAZAO": {
+            "type": "string"
+          },
+          "NOME_FANTASIA": {
+            "type": "string"
+          },
+          "CPF_CNPJ": {
+            "type": "string"
+          },
+          "IE": {
+            "type": "string"
+          },
+          "EMAIL": {
+            "type": "string"
+          },
+          "TELEFONE": {
+            "type": "string"
+          },
+          "ENDERECO": {
+            "type": "string"
+          },
+          "NUMERO": {
+            "type": "string"
+          },
+          "COMPLEMENTO": {
+            "type": "string"
+          },
+          "BAIRRO": {
+            "type": "string"
+          },
+          "CEP": {
+            "type": "string"
+          },
+          "MUNICIPIO": {
+            "type": "string"
+          },
+          "UF": {
+            "type": "string"
+          },
+          "TIPO_PESSOA": {
+            "type": "string",
+            "enum": [
+              "F",
+              "J"
+            ]
+          },
+          "CODIGO_PAIS": {
+            "type": "integer"
+          },
+          "ATIVO": {
+            "type": "string",
+            "enum": [
+              "S",
+              "N"
+            ]
+          }
+        }
+      },
+      "Contato": {
+        "type": "object",
+        "properties": {
+          "ID_CONTATO": {
+            "type": "integer"
+          },
+          "ID_CLIENTE": {
+            "type": "integer"
+          },
+          "NOME_CONTATO": {
+            "type": "string"
+          },
+          "TELEFONE_CONTATO": {
+            "type": "string"
+          },
+          "EMAIL_CONTATO": {
+            "type": "string"
+          },
+          "CARGO": {
+            "type": "string"
+          },
+          "OBSERVACAO": {
+            "type": "string"
+          },
+          "TIPO_CONTATO": {
+            "type": "string"
+          }
+        }
+      },
+      "Contrato": {
+        "type": "object",
+        "properties": {
+          "ID_CONTRATO": {
+            "type": "integer"
+          },
+          "ID_CLIENTE": {
+            "type": "integer"
+          },
+          "NOME_RAZAO": {
+            "type": "string"
+          },
+          "DATA_INICIO": {
+            "type": "string",
+            "format": "date"
+          },
+          "DATA_FIM": {
+            "type": "string",
+            "format": "date"
+          },
+          "VALOR_MENSAL": {
+            "type": "number"
+          },
+          "ID_STATUS": {
+            "type": "integer"
+          },
+          "STATUS_NOME": {
+            "type": "string"
+          },
+          "DESCRICAO": {
+            "type": "string"
+          },
+          "OBSERVACOES": {
+            "type": "string"
+          }
+        }
+      },
+      "Pagamento": {
+        "type": "object",
+        "properties": {
+          "ID_PAGAMENTO": {
+            "type": "integer"
+          },
+          "ID_CONTRATO": {
+            "type": "integer"
+          },
+          "DATA_VENCIMENTO": {
+            "type": "string",
+            "format": "date"
+          },
+          "DATA_PAGAMENTO": {
+            "type": "string",
+            "format": "date"
+          },
+          "VALOR_PAGO": {
+            "type": "number"
+          },
+          "STATUS_PAGAMENTO": {
+            "type": "string",
+            "enum": [
+              "pendente",
+              "pago",
+              "atrasado"
+            ]
+          }
+        }
+      },
+      "Auditoria": {
+        "type": "object",
+        "properties": {
+          "ID_LOG": {
+            "type": "integer"
+          },
+          "ID_USUARIO": {
+            "type": "integer"
+          },
+          "ID_ACAO": {
+            "type": "integer"
+          },
+          "ENTIDADE": {
+            "type": "string"
+          },
+          "ID_ENTIDADE": {
+            "type": "integer"
+          },
+          "DATA_HORA": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Permissao": {
+        "type": "object",
+        "properties": {
+          "ID_PERFIL": {
+            "type": "integer"
+          },
+          "NOME_TELA": {
+            "type": "string"
+          },
+          "PODE_ACESSAR": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Acao": {
+        "type": "object",
+        "properties": {
+          "ID_ACAO": {
+            "type": "integer"
+          },
+          "NOME": {
+            "type": "string"
+          },
+          "DESCRICAO": {
+            "type": "string"
+          }
+        }
+      },
+      "Tecnico": {
+        "type": "object",
+        "properties": {
+          "ID_TECNICO": {
+            "type": "integer"
+          },
+          "NOME": {
+            "type": "string"
+          },
+          "CPF": {
+            "type": "string"
+          },
+          "EMAIL": {
+            "type": "string"
+          },
+          "TELEFONE": {
+            "type": "string"
+          },
+          "ESPECIALIDADES": {
+            "type": "string"
+          },
+          "ESPECIALIDADES_IDS": {
+            "type": "string"
+          }
+        }
+      },
+      "Especialidade": {
+        "type": "object",
+        "properties": {
+          "ID_ESPECIALIDADE": {
+            "type": "integer"
+          },
+          "NOME": {
+            "type": "string"
+          }
+        }
+      },
+      "Ativo": {
+        "type": "object",
+        "properties": {
+          "ID_ATIVO": {
+            "type": "integer"
+          },
+          "DESCRICAO": {
+            "type": "string"
+          },
+          "NUMERO_SERIE": {
+            "type": "string"
+          },
+          "ID_STATUS": {
+            "type": "integer"
+          },
+          "STATUS_NOME": {
+            "type": "string"
+          },
+          "ID_CLIENTE_PROPRIETARIO": {
+            "type": "integer"
+          },
+          "PROPRIETARIO": {
+            "type": "string"
+          }
+        }
+      },
+      "Status": {
+        "type": "object",
+        "properties": {
+          "ID_STATUS": {
+            "type": "integer"
+          },
+          "STATUS": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Returns the status of the server and database connection.",
+        "responses": {
+          "200": {
+            "description": "Server is up and connected to DB."
+          },
+          "500": {
+            "description": "Database connection error."
+          }
+        }
+      }
+    },
+    "/api/clientes": {
+      "get": {
+        "summary": "List Clients",
+        "description": "Returns the first 50 clients ordered by name.",
+        "responses": {
+          "200": {
+            "description": "A list of clients.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Cliente"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Client",
+        "description": "Adds a new client to the database.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Cliente"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Client created successfully."
+          }
+        }
+      }
+    },
+    "/api/clientes/{id}": {
+      "put": {
+        "summary": "Update Client",
+        "description": "Updates an existing client's details.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Cliente"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Client updated successfully."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Client",
+        "description": "Removes a client from the database.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Client deleted successfully."
+          }
+        }
+      }
+    },
+    "/api/contatos": {
+      "get": {
+        "summary": "List All Contacts",
+        "description": "Returns all contacts in the CRM.",
+        "responses": {
+          "200": {
+            "description": "A list of contacts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Contato"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Contact",
+        "description": "Adds a new contact for a client.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Contato"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contact created successfully."
+          }
+        }
+      }
+    },
+    "/api/contatos/{id}": {
+      "put": {
+        "summary": "Update Contact",
+        "description": "Updates an existing contact's details.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Contato"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contact updated successfully."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Contact",
+        "description": "Removes a contact from the database.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contact deleted successfully."
+          }
+        }
+      }
+    },
+    "/api/contratos": {
+      "get": {
+        "summary": "List Contracts",
+        "description": "Returns all contracts with client and status details.",
+        "responses": {
+          "200": {
+            "description": "A list of contracts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Contrato"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Contract",
+        "description": "Adds a new contract to the database.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Contrato"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contract created successfully."
+          }
+        }
+      }
+    },
+    "/api/contratos/{id}": {
+      "put": {
+        "summary": "Update Contract",
+        "description": "Updates an existing contract's details.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Contrato"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contract updated successfully."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Contract",
+        "description": "Removes a contract from the database.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contract deleted successfully."
+          }
+        }
+      }
+    },
+    "/api/status": {
+      "get": {
+        "summary": "List Asset Statuses",
+        "description": "Returns all possible statuses for assets.",
+        "responses": {
+          "200": {
+            "description": "A list of status codes and names.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Status"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Asset Status",
+        "description": "Adds a new asset status code.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Status"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status created successfully."
+          }
+        }
+      }
+    },
+    "/api/status/{id}": {
+      "put": {
+        "summary": "Update Asset Status",
+        "description": "Updates an existing asset status name.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Status"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status updated successfully."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Asset Status",
+        "description": "Removes a status code from the database.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status deleted successfully."
+          }
+        }
+      }
+    },
+    "/api/ativos": {
+      "get": {
+        "summary": "List Assets",
+        "description": "Returns all assets with owner and status details.",
+        "responses": {
+          "200": {
+            "description": "A list of assets.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Ativo"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Asset",
+        "description": "Adds a new asset to the database.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Ativo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Asset created successfully."
+          }
+        }
+      }
+    },
+    "/api/ativos/{id}": {
+      "put": {
+        "summary": "Update Asset",
+        "description": "Updates an existing asset's details.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Ativo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Asset updated successfully."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Asset",
+        "description": "Removes an asset from the database.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Asset deleted successfully."
+          }
+        }
+      }
+    },
+    "/api/perfis": {
+      "post": {
+        "summary": "Create Profile",
+        "description": "Adds a new user profile.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "NOME": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile created successfully."
+          }
+        }
+      }
+    },
+    "/api/perfis/{id}": {
+      "put": {
+        "summary": "Update Profile",
+        "description": "Updates an existing user profile.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "NOME": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile updated successfully."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Profile",
+        "description": "Removes a user profile from the database.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profile deleted successfully."
+          }
+        }
+      }
+    },
+    "/api/tecnicos": {
+      "get": {
+        "summary": "List Technicians",
+        "description": "Returns all technicians with their specialties.",
+        "responses": {
+          "200": {
+            "description": "A list of technicians.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Tecnico"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Technician",
+        "description": "Adds a new technician and their specialties.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Tecnico"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Technician created successfully."
+          }
+        }
+      }
+    },
+    "/api/tecnicos/{id}": {
+      "put": {
+        "summary": "Update Technician",
+        "description": "Updates an existing technician's details and specialties.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Tecnico"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Technician updated successfully."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Technician",
+        "description": "Removes a technician from the database.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Technician deleted successfully."
+          }
+        }
+      }
+    },
+    "/api/especialidades": {
+      "get": {
+        "summary": "List Specialties",
+        "description": "Returns all technician specialties.",
+        "responses": {
+          "200": {
+            "description": "A list of specialties.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Especialidade"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Specialty",
+        "description": "Adds a new technician specialty.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Especialidade"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Specialty created successfully."
+          }
+        }
+      }
+    },
+    "/api/especialidades/{id}": {
+      "put": {
+        "summary": "Update Specialty",
+        "description": "Updates an existing specialty.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Especialidade"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Specialty updated successfully."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Specialty",
+        "description": "Removes a specialty from the database.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Specialty deleted successfully."
+          }
+        }
+      }
+    },
+    "/api/agendamentos/{id}": {
+      "delete": {
+        "summary": "Delete Appointment",
+        "description": "Removes an appointment from the database.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Appointment deleted successfully."
+          }
+        }
+      }
+    },
+    "/api/pagamentos": {
+      "get": {
+        "summary": "List Payments",
+        "description": "Returns all payments from the database.",
+        "responses": {
+          "200": {
+            "description": "A list of payments.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Pagamento"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Payment",
+        "description": "Adds a new payment record.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Pagamento"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment created successfully."
+          }
+        }
+      }
+    },
+    "/api/pagamentos/{id}": {
+      "put": {
+        "summary": "Update Payment",
+        "description": "Updates an existing payment record.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Pagamento"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment updated successfully."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Payment",
+        "description": "Removes a payment record from the database.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment deleted successfully."
+          }
+        }
+      }
+    },
+    "/api/auditoria": {
+      "get": {
+        "summary": "List Audit Logs",
+        "description": "Returns the CRM audit logs.",
+        "responses": {
+          "200": {
+            "description": "A list of audit logs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Auditoria"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/permissoes": {
+      "get": {
+        "summary": "List Permissions",
+        "description": "Returns all screen permissions for profiles.",
+        "responses": {
+          "200": {
+            "description": "A list of permissions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Permissao"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Permission",
+        "description": "Adds a new screen permission for a profile.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Permissao"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Permission created successfully."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Permission",
+        "description": "Removes a screen permission.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ID_PERFIL": {
+                    "type": "integer"
+                  },
+                  "ID_SCREEN": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Permission deleted successfully."
+          }
+        }
+      }
+    },
+    "/api/acoes": {
+      "get": {
+        "summary": "List Actions",
+        "description": "Returns all audit actions.",
+        "responses": {
+          "200": {
+            "description": "A list of actions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Acao"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": []
+}
