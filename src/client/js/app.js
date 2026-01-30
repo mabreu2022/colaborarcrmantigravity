@@ -24,11 +24,25 @@ class AppManager {
         if (dashboardNav) dashboardNav.classList.add('active');
     }
 
-    setupUser() {
-        const user = JSON.parse(localStorage.getItem('user'));
-        if (user) {
-            document.querySelector('.user-name').textContent = user.NOME;
-            document.querySelector('.avatar').textContent = user.NOME.charAt(0).toUpperCase();
+    setupUser(userData) {
+        const user = userData || JSON.parse(localStorage.getItem('user'));
+        console.log('AppManager.setupUser:', user);
+
+        const nome = user ? (user.NOME || user.Nome || user.nome || user.name) : null;
+
+        if (nome) {
+            const userNameEl = document.querySelector('.user-name');
+            if (userNameEl) userNameEl.textContent = nome;
+
+            const avatarEl = document.querySelector('.avatar');
+            if (avatarEl) {
+                const initial = nome.charAt(0).toUpperCase();
+                avatarEl.textContent = initial;
+            }
+        } else {
+            console.warn("Aguardando dados do usuário...", user);
+            const avatarEl = document.querySelector('.avatar');
+            if (avatarEl) avatarEl.textContent = '?';
         }
     }
 
