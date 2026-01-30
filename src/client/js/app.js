@@ -26,7 +26,6 @@ class AppManager {
 
     setupUser(userData) {
         const user = userData || JSON.parse(localStorage.getItem('user'));
-        console.log('AppManager.setupUser:', user);
 
         const nome = user ? (user.NOME || user.Nome || user.nome || user.name) : null;
 
@@ -40,7 +39,7 @@ class AppManager {
                 avatarEl.textContent = initial;
             }
         } else {
-            console.warn("Aguardando dados do usuário...", user);
+            console.warn("Aguardando dados do usuário...");
             const avatarEl = document.querySelector('.avatar');
             if (avatarEl) avatarEl.textContent = '?';
         }
