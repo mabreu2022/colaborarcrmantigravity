@@ -361,7 +361,7 @@ class AppManager {
             NOME: document.getElementById('userName').value,
             EMAIL: document.getElementById('userEmail').value,
             ID_PERFIL: document.getElementById('userProfile').value,
-            SENHA: document.getElementById('userPass').value
+            SENHA: document.getElementById('userPassword').value
         };
 
         if (!data.NOME || !data.EMAIL || !data.ID_PERFIL) {
@@ -2004,12 +2004,21 @@ class AppManager {
         }
 
         // 5. User Profiles
-        if (userProfile && userProfile.innerHTML.length < 100) {
+        if (userProfile) { // Removed length check to force reload
             try {
                 const profiles = await (await fetch('api/perfis')).json();
+                console.log('Profiles Loaded:', profiles);
+
+                if (profiles.length === 0) {
+                    alert('Atenção: Nenhum perfil encontrado no banco de dados!');
+                }
+
                 userProfile.innerHTML = '<option value="">Selecione...</option>';
                 profiles.forEach(p => userProfile.options.add(new Option(p.NOME, p.ID_PERFIL)));
-            } catch (e) { console.error("Error loading profiles", e); }
+            } catch (e) {
+                console.error("Error loading profiles", e);
+                alert('Erro ao carregar perfis: ' + e.message);
+            }
         }
     }
 
