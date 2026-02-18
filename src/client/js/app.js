@@ -79,6 +79,10 @@ class AppManager {
 
     async loadPage(page) {
         const contentArea = document.getElementById('content-area');
+        const breadcrumbs = document.querySelector('.breadcrumbs');
+        if (breadcrumbs) {
+            breadcrumbs.textContent = page.charAt(0).toUpperCase() + page.slice(1);
+        }
         // Simple router logic - to be expanded
         switch (page) {
             case 'clients':
@@ -117,12 +121,40 @@ class AppManager {
             case 'settings':
                 await this.loadSettingsView();
                 break;
+            case 'estoque':
+                await this.loadEstoqueView();
+                break;
+            case 'fornecedores':
+                await this.loadFornecedoresView();
+                break;
             default:
                 contentArea.innerHTML = `<h2>${page} Content Placeholder</h2>`;
         }
     }
 
     // ... (loadContracts and renderContracts remain) ...
+
+    async loadEstoqueView() {
+        const contentArea = document.getElementById('content-area');
+        if (window.estoqueManager) {
+            contentArea.innerHTML = window.estoqueManager.getTemplate();
+            await window.estoqueManager.init();
+        } else {
+            contentArea.innerHTML = '<div class="error-message">Erro: Gestor de estoque não carregado.</div>';
+        }
+    }
+
+    async loadFornecedoresView() {
+        const contentArea = document.getElementById('content-area');
+        if (window.estoqueManager) {
+            const breadcrumbs = document.querySelector('.breadcrumbs');
+            if (breadcrumbs) breadcrumbs.textContent = 'Fornecedores';
+            contentArea.innerHTML = window.estoqueManager.getTemplate();
+            window.estoqueManager.switchTab('fornecedores');
+        } else {
+            contentArea.innerHTML = '<div class="error-message">Erro: Gestor de estoque não carregado.</div>';
+        }
+    }
 
     async loadAssets() {
         try {

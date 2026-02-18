@@ -1890,8 +1890,318 @@ app.delete('/api/acoes/:id', async (req, res) => {
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
+// --- INVENTORY (ESTOQUE) ROUTES ---
+
+/**
+ * @openapi
+ * /api/produtos:
+ *   get:
+ *     summary: List Products
+ *     description: Returns all products in the inventory.
+ *     responses:
+ *       200:
+ *         description: A list of products.
+ */
+app.get('/api/produtos', async (req, res) => {
+    try {
+        const query = `
+            SELECT P.*, F.RAZAO_SOCIAL as FORNECEDOR_NOME
+            FROM PRODUTOS P
+            LEFT JOIN FORNECEDORES F ON P.ID_FORNECEDOR = F.ID_FORNECEDOR
+            WHERE P.ATIVO = 'S'
+            ORDER BY P.NOME
+        `;
+        const result = await db.query(query);
+        res.json(result);
+    } catch (error) {
+        console.error('Error in GET /api/produtos:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @openapi
+ * /api/produtos:
+ *   post:
+ *     summary: Create Product
+ *     description: Adds a new product to the inventory.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               NOME: { type: 'string' }
+ *               DESCRICAO: { type: 'string' }
+ *               UNIDADE: { type: 'string' }
+ *               PRECO_VENDA: { type: 'number' }
+ *     responses:
+ *       200:
+ *         description: Product created successfully.
+ */
+app.post('/api/produtos', async (req, res) => {
+    const { NOME, DESCRICAO, UNIDADE, PRECO_VENDA, DATA_COMPRA, NUMERO_NF, ID_FORNECEDOR } = req.body;
+    try {
+        const query = `
+            INSERT INTO PRODUTOS (NOME, DESCRICAO, UNIDADE, PRECO_VENDA, SALDO_ATUAL, ATIVO, DATA_COMPRA, NUMERO_NF, ID_FORNECEDOR)
+            VALUES (?, ?, ?, ?, 0, 'S', ?, ?, ?)
+            RETURNING ID_PRODUTO
+        `;
+        const result = await db.query(query, [
+            sanitize(NOME), sanitize(DESCRICAO), sanitize(UNIDADE) || 'UN',
+            PRECO_VENDA || 0, DATA_COMPRA || null, sanitize(NUMERO_NF) || null, ID_FORNECEDOR || null
+        ]);
+        res.json({ success: true, id: result.ID_PRODUTO });
+    } catch (error) {
+        console.error('Error in POST /api/produtos:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @openapi
+ * /api/produtos/{id}:
+ *   put:
+ *     summary: Update Product
+ *     description: Updates an existing product's details.
+ */
+app.put('/api/produtos/:id', async (req, res) => {
+    const { id } = req.params;
+    const { NOME, DESCRICAO, UNIDADE, PRECO_VENDA, ATIVO, DATA_COMPRA, NUMERO_NF, ID_FORNECEDOR } = req.body;
+    try {
+        const query = `
+            UPDATE PRODUTOS 
+            SET NOME = ?, DESCRICAO = ?, UNIDADE = ?, PRECO_VENDA = ?, ATIVO = ?, 
+                DATA_COMPRA = ?, NUMERO_NF = ?, ID_FORNECEDOR = ?
+            WHERE ID_PRODUTO = ?
+        `;
+        await db.query(query, [
+            sanitize(NOME), sanitize(DESCRICAO), sanitize(UNIDADE), PRECO_VENDA, ATIVO || 'S',
+            DATA_COMPRA || null, sanitize(NUMERO_NF) || null, ID_FORNECEDOR || null, id
+        ]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @openapi
+ * /api/produtos/{id}:
+ *   delete:
+ *     summary: Delete Product
+ *     description: Logically deletes a product by setting ATIVO = 'N'.
+ */
+app.delete('/api/produtos/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await db.query('UPDATE PRODUTOS SET ATIVO = \'N\' WHERE ID_PRODUTO = ?', [id]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @openapi
+ * /api/movimentacoes:
+ *   get:
+ *     summary: List Movements
+ *     description: Returns all stock movements with product details.
+ */
+app.get('/api/movimentacoes', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                M.*, 
+                P.NOME as PRODUTO_NOME,
+                U.NOME as USUARIO_NOME
+            FROM MOVIMENTACOES_ESTOQUE M
+            JOIN PRODUTOS P ON M.ID_PRODUTO = P.ID_PRODUTO
+            LEFT JOIN USUARIOS U ON M.ID_USUARIO = U.ID_USUARIO
+            ORDER BY M.DATA_MOV DESC
+        `;
+        const result = await db.query(query);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @openapi
+ * /api/movimentacoes:
+ *   post:
+ *     summary: Create Movement
+ *     description: Adds a new stock movement and updates the product balance.
+ */
+app.post('/api/movimentacoes', async (req, res) => {
+    const { ID_PRODUTO, TIPO, QUANTIDADE, MOTIVO, ID_USUARIO } = req.body;
+
+    if (!['E', 'S'].includes(TIPO)) {
+        return res.status(400).json({ error: 'Tipo de movimentação inválido (E ou S).' });
+    }
+
+    try {
+        // 1. Insert Movement
+        const movQuery = `
+            INSERT INTO MOVIMENTACOES_ESTOQUE (ID_PRODUTO, TIPO, QUANTIDADE, MOTIVO, ID_USUARIO)
+            VALUES (?, ?, ?, ?, ?)
+            RETURNING ID_MOVIMENTACAO
+        `;
+        const movResult = await db.query(movQuery, [ID_PRODUTO, TIPO, QUANTIDADE, MOTIVO, ID_USUARIO]);
+
+        // 2. Update Product Balance
+        const factor = TIPO === 'E' ? 1 : -1;
+        const balanceQuery = `
+            UPDATE PRODUTOS 
+            SET SALDO_ATUAL = SALDO_ATUAL + (?)
+            WHERE ID_PRODUTO = ?
+        `;
+        await db.query(balanceQuery, [QUANTIDADE * factor, ID_PRODUTO]);
+
+        res.json({ success: true, id: movResult.ID_MOVIMENTACAO });
+    } catch (error) {
+        console.error('Erro na movimentação de estoque:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// --- FORNECEDORES API ---
+
+app.get('/api/fornecedores', async (req, res) => {
+    try {
+        const result = await db.query('SELECT * FROM FORNECEDORES WHERE ATIVO = \'S\' ORDER BY RAZAO_SOCIAL');
+        res.json(result);
+    } catch (error) {
+        console.error('Error in GET /api/fornecedores:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/fornecedores', async (req, res) => {
+    const { RAZAO_SOCIAL, CNPJ, IE, IM, NOME_FANTASIA, ENDERECO, NUMERO, BAIRRO, CIDADE, UF, CEP } = req.body;
+    try {
+        const query = `
+            INSERT INTO FORNECEDORES (RAZAO_SOCIAL, CNPJ, IE, IM, NOME_FANTASIA, ENDERECO, NUMERO, BAIRRO, CIDADE, UF, CEP, ATIVO)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'S')
+            RETURNING ID_FORNECEDOR
+        `;
+        const result = await db.query(query, [
+            sanitize(RAZAO_SOCIAL), cleanDigits(CNPJ), sanitize(IE), sanitize(IM),
+            sanitize(NOME_FANTASIA), sanitize(ENDERECO), sanitize(NUMERO),
+            sanitize(BAIRRO), sanitize(CIDADE), sanitize(UF), cleanDigits(CEP)
+        ]);
+        res.json({ success: true, id: result.ID_FORNECEDOR });
+    } catch (error) {
+        console.error('Error in POST /api/fornecedores:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/fornecedores/:id', async (req, res) => {
+    const { id } = req.params;
+    const { RAZAO_SOCIAL, CNPJ, IE, IM, NOME_FANTASIA, ENDERECO, NUMERO, BAIRRO, CIDADE, UF, CEP, ATIVO } = req.body;
+    try {
+        const query = `
+            UPDATE FORNECEDORES 
+            SET RAZAO_SOCIAL = ?, CNPJ = ?, IE = ?, IM = ?, NOME_FANTASIA = ?, 
+                ENDERECO = ?, NUMERO = ?, BAIRRO = ?, CIDADE = ?, UF = ?, CEP = ?, ATIVO = ?
+            WHERE ID_FORNECEDOR = ?
+        `;
+        await db.query(query, [
+            sanitize(RAZAO_SOCIAL), cleanDigits(CNPJ), sanitize(IE), sanitize(IM),
+            sanitize(NOME_FANTASIA), sanitize(ENDERECO), sanitize(NUMERO),
+            sanitize(BAIRRO), sanitize(CIDADE), sanitize(UF), cleanDigits(CEP), ATIVO || 'S', id
+        ]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/api/fornecedores/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await db.query('UPDATE FORNECEDORES SET ATIVO = \'N\' WHERE ID_FORNECEDOR = ?', [id]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// --- CONTATOS FORNECEDOR API ---
+
+app.get('/api/fornecedores/:id/contatos', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await db.query('SELECT * FROM CONTATOS_FORNECEDOR WHERE ID_FORNECEDOR = ? ORDER BY NOME', [id]);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/contatos-fornecedor', async (req, res) => {
+    const { ID_FORNECEDOR, NOME, EMAIL, CELULAR } = req.body;
+    try {
+        const query = `
+            INSERT INTO CONTATOS_FORNECEDOR (ID_FORNECEDOR, NOME, EMAIL, CELULAR)
+            VALUES (?, ?, ?, ?)
+            RETURNING ID_CONTATO
+        `;
+        const result = await db.query(query, [ID_FORNECEDOR, sanitize(NOME), sanitize(EMAIL), cleanDigits(CELULAR)]);
+        res.json({ success: true, id: result.ID_CONTATO });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/api/contatos-fornecedor/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await db.query('DELETE FROM CONTATOS_FORNECEDOR WHERE ID_CONTATO = ?', [id]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
 
+// Helper functions for data sanitization
+function sanitize(val) {
+    if (val === undefined || val === null) return null;
+    if (typeof val === 'string') return val.trim().toUpperCase();
+    return val;
+}
+
+function cleanDigits(val) {
+    if (val === undefined || val === null) return null;
+    return val.toString().replace(/\D/g, '');
+}
+
+// Debug route to pinpoint DB issues
+app.get('/api/debug-db', async (req, res) => {
+    try {
+        const query = req.query.q || 'SELECT FIRST 5 * FROM FORNECEDORES';
+        console.log('DEBUG DB Query:', query);
+        const result = await db.query(query);
+        res.json({ success: true, count: result.length, data: result });
+    } catch (e) {
+        console.error('DEBUG DB Error:', e);
+        res.status(500).json({ success: false, error: e.message, stack: e.stack });
+    }
+});
+
+// Global Error Handlers
+process.on('uncaughtException', (err) => {
+    console.error('CRITICAL: Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('CRITICAL: Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
 // Start Server
 app.listen(port, '0.0.0.0', async () => {

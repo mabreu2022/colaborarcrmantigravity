@@ -20,6 +20,7 @@ const db = {
             pool.get((err, db) => {
                 if (err) return reject(err);
 
+                console.log('DB QUERY:', query, params);
                 db.query(query, params, (err, result) => {
                     db.detach(); // release connection back to pool
                     if (err) return reject(err);
