@@ -766,7 +766,8 @@ app.get('/api/ativos', async (req, res) => {
                 A.ID_STATUS,
                 S.STATUS as STATUS_NOME,
                 A.ID_CLIENTE_PROPRIETARIO,
-                C.NOME_RAZAO as PROPRIETARIO
+                C.NOME_RAZAO as PROPRIETARIO,
+                A.ID_PRODUTO
             FROM ATIVOS A
             LEFT JOIN CLIENTES C ON A.ID_CLIENTE_PROPRIETARIO = C.ID_CLIENTE
             LEFT JOIN "STATUS" S ON A.ID_STATUS = S.ID_STATUS
@@ -795,15 +796,20 @@ app.get('/api/ativos', async (req, res) => {
  *         description: Asset created successfully.
  */
 app.post('/api/ativos', async (req, res) => {
-
-    const { DESCRICAO, NUMERO_SERIE, ID_STATUS, ID_CLIENTE_PROPRIETARIO } = req.body;
+    const { DESCRICAO, NUMERO_SERIE, ID_STATUS, ID_CLIENTE_PROPRIETARIO, ID_PRODUTO } = req.body;
     try {
         const query = `
-            INSERT INTO ATIVOS (DESCRICAO, NUMERO_SERIE, ID_STATUS, ID_CLIENTE_PROPRIETARIO)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO ATIVOS (DESCRICAO, NUMERO_SERIE, ID_STATUS, ID_CLIENTE_PROPRIETARIO, ID_PRODUTO)
+            VALUES (?, ?, ?, ?, ?)
             RETURNING ID_ATIVO
         `;
-        const result = await db.query(query, [DESCRICAO, NUMERO_SERIE, ID_STATUS, ID_CLIENTE_PROPRIETARIO]);
+        const result = await db.query(query, [sanitize(DESCRICAO), sanitize(NUMERO_SERIE), ID_STATUS, ID_CLIENTE_PROPRIETARIO, ID_PRODUTO]);
+
+        // Se já nascer em estoque (Status 2), sincroniza
+        if (ID_STATUS == 2 && ID_PRODUTO) {
+            await syncAssetToInventory(result.ID_ATIVO, 2);
+        }
+
         res.json({ success: true, id: result.ID_ATIVO });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -833,17 +839,57 @@ app.post('/api/ativos', async (req, res) => {
  *         description: Asset updated successfully.
  */
 app.put('/api/ativos/:id', async (req, res) => {
-
     const { id } = req.params;
-    const { DESCRICAO, NUMERO_SERIE, ID_STATUS, ID_CLIENTE_PROPRIETARIO } = req.body;
+    const { DESCRICAO, NUMERO_SERIE, ID_STATUS, ID_CLIENTE_PROPRIETARIO, ID_PRODUTO } = req.body;
     try {
-        const query = `UPDATE ATIVOS SET DESCRICAO=?, NUMERO_SERIE=?, ID_STATUS=?, ID_CLIENTE_PROPRIETARIO=? WHERE ID_ATIVO=?`;
-        await db.query(query, [DESCRICAO, NUMERO_SERIE, ID_STATUS, ID_CLIENTE_PROPRIETARIO, id]);
+        // 1. Get current status to check for changes
+        const currentAsset = (await db.query('SELECT ID_STATUS, ID_PRODUTO FROM ATIVOS WHERE ID_ATIVO = ?', [id]))[0];
+
+        // 2. Update Asset
+        const query = `UPDATE ATIVOS SET DESCRICAO=?, NUMERO_SERIE=?, ID_STATUS=?, ID_CLIENTE_PROPRIETARIO=?, ID_PRODUTO=? WHERE ID_ATIVO=?`;
+        await db.query(query, [sanitize(DESCRICAO), sanitize(NUMERO_SERIE), ID_STATUS, ID_CLIENTE_PROPRIETARIO, ID_PRODUTO, id]);
+
+        // 3. If status changed to "Estoque" (2) and it wasn't before
+        if (ID_STATUS == 2 && currentAsset && currentAsset.ID_STATUS != 2) {
+            await syncAssetToInventory(id, 2);
+        }
+
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
+
+// Helper to sync Asset entry to Inventory balance
+async function syncAssetToInventory(idAtivo, statusId) {
+    if (statusId != 2) return; // Só interessa se for estoque (2)
+
+    try {
+        const asset = (await db.query('SELECT ID_PRODUTO, DESCRICAO FROM ATIVOS WHERE ID_ATIVO = ?', [idAtivo]))[0];
+        if (!asset || !asset.ID_PRODUTO) return;
+
+        console.log(`Sincronizando Ativo ${idAtivo} para Estoque do Produto ${asset.ID_PRODUTO}`);
+
+        // 1. Incrementar Saldo Atual
+        await db.query('UPDATE PRODUTOS SET SALDO_ATUAL = SALDO_ATUAL + 1 WHERE ID_PRODUTO = ?', [asset.ID_PRODUTO]);
+
+        // 2. Registrar Movimentação de Entrada
+        const movQuery = `
+            INSERT INTO MOVIMENTACOES_ESTOQUE (ID_PRODUTO, TIPO, QUANTIDADE, MOTIVO, DATA_MOV)
+            VALUES (?, 'E', 1, ?, CURRENT_TIMESTAMP)
+        `;
+        await db.query(movQuery, [asset.ID_PRODUTO, `RETORNO DE ATIVO: ${asset.DESCRICAO} (ID: ${idAtivo})`]);
+
+        // 3. Desvincular Cliente/Contrato no registro do ativo (caso existam esses campos)
+        // Nota: Baseado na análise, os vínculos principais ficam na AGENDA, 
+        // mas se houver ID_CLIENTE_PROPRIETARIO, ele deve ser mantido ou resetado para a Colaborar.
+        await db.query('UPDATE ATIVOS SET ID_CLIENTE_PROPRIETARIO = NULL WHERE ID_ATIVO = ?', [idAtivo]);
+
+    } catch (e) {
+        console.error('Erro ao sincronizar ativo com estoque:', e);
+        throw e;
+    }
+}
 
 /**
  * @openapi
@@ -1306,9 +1352,10 @@ app.put('/api/agendamentos/:id', async (req, res) => {
             `;
         await db.query(query, [ID_CLIENTE, ID_CONTATO, ID_CONTRATO, ID_ATIVO, DATA_RETIRADA, HORARIO_INICIO, HORARIO_FIM, DATA_DEVOLUCAO_PREVISTA, DATA_DEVOLUCAO, OBSERVACAO, ID_STATUS, QUANTIDADE, id]);
 
-        // If returned (Data Devolucao Set), free the asset?
+        // If returned (Data Devolucao Set), free the asset and sync to inventory
         if (DATA_DEVOLUCAO && ID_ATIVO) {
             await db.query('UPDATE ATIVOS SET ID_STATUS = 2 WHERE ID_ATIVO = ?', [ID_ATIVO]);
+            await syncAssetToInventory(ID_ATIVO, 2);
         }
 
         // --- UPDATE TECHNICIANS ---
@@ -1904,6 +1951,7 @@ app.delete('/api/acoes/:id', async (req, res) => {
  */
 app.get('/api/produtos', async (req, res) => {
     try {
+        console.log('GET /api/produtos - Iniciando query...');
         const query = `
             SELECT P.*, F.RAZAO_SOCIAL as FORNECEDOR_NOME
             FROM PRODUTOS P
@@ -1912,6 +1960,7 @@ app.get('/api/produtos', async (req, res) => {
             ORDER BY P.NOME
         `;
         const result = await db.query(query);
+        console.log('GET /api/produtos - Sucesso, itens retornados:', result.length);
         res.json(result);
     } catch (error) {
         console.error('Error in GET /api/produtos:', error);

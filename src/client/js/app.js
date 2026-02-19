@@ -192,6 +192,9 @@ class AppManager {
             document.getElementById('assetSerial').value = asset.NUMERO_SERIE || '';
             document.getElementById('assetStatusDb').value = asset.ID_STATUS;
             document.getElementById('assetOwner').value = asset.ID_CLIENTE_PROPRIETARIO || '';
+            if (document.getElementById('assetProduct')) {
+                document.getElementById('assetProduct').value = asset.ID_PRODUTO || '';
+            }
         } else {
             title.textContent = 'Novo Ativo';
         }
@@ -204,7 +207,8 @@ class AppManager {
             DESCRICAO: document.getElementById('assetDesc').value,
             NUMERO_SERIE: document.getElementById('assetSerial').value,
             ID_STATUS: document.getElementById('assetStatusDb').value,
-            ID_CLIENTE_PROPRIETARIO: document.getElementById('assetOwner').value || null
+            ID_CLIENTE_PROPRIETARIO: document.getElementById('assetOwner').value || null,
+            ID_PRODUTO: document.getElementById('assetProduct')?.value || null
         };
 
         if (!data.DESCRICAO || !data.ID_STATUS) {
@@ -2039,18 +2043,22 @@ class AppManager {
         if (userProfile) { // Removed length check to force reload
             try {
                 const profiles = await (await fetch('api/perfis')).json();
-                console.log('Profiles Loaded:', profiles);
-
-                if (profiles.length === 0) {
-                    alert('Atenção: Nenhum perfil encontrado no banco de dados!');
-                }
-
                 userProfile.innerHTML = '<option value="">Selecione...</option>';
                 profiles.forEach(p => userProfile.options.add(new Option(p.NOME, p.ID_PERFIL)));
-            } catch (e) {
-                console.error("Error loading profiles", e);
-                alert('Erro ao carregar perfis: ' + e.message);
-            }
+            } catch (e) { console.error("Error loading profiles", e); }
+        }
+
+        // 6. Asset Products (New)
+        const assetProduct = document.getElementById('assetProduct');
+        if (assetProduct) {
+            try {
+                const products = await (await fetch('api/produtos')).json();
+                assetProduct.innerHTML = '<option value="">Selecione um produto...</option>';
+                products.forEach(p => {
+                    const text = `${p.NOME} (${p.UNIDADE})`;
+                    assetProduct.options.add(new Option(text, p.ID_PRODUTO));
+                });
+            } catch (e) { console.error("Error loading products for assets", e); }
         }
     }
 

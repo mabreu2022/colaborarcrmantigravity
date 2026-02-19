@@ -126,8 +126,11 @@ class EstoqueManager {
 
     async loadProdutos() {
         try {
+            console.log("Chamando fetch api/produtos...");
             const res = await fetch('api/produtos');
+            console.log("Resposta fetch api/produtos recebida:", res.status);
             const data = await res.json();
+            console.log("Dados extraídos de api/produtos:", data);
             this.renderProdutos(data);
         } catch (error) {
             console.error("Erro ao carregar produtos:", error);
@@ -135,10 +138,13 @@ class EstoqueManager {
     }
 
     renderProdutos(data) {
+        console.log("Renderizando produtos, data:", data);
         const tbody = document.getElementById('produtosTableBody');
+        console.log("tbody encontrado:", !!tbody);
         if (!tbody) return;
 
         if (data.length === 0) {
+            console.log("Nenhum produto para renderizar.");
             tbody.innerHTML = '<tr><td colspan="6" style="text-align:center">Nenhum produto cadastrado.</td></tr>';
             return;
         }
