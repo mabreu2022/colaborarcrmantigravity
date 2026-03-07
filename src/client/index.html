@@ -23,7 +23,7 @@
                 <ul>
                     <li><a href="#" class="nav-item active" data-target="dashboard"><span class="icon">🏠</span>
                             Dashboard</a></li>
-                    <li><a href="#" class="nav-item" data-target="clients"><span class="icon">👥</span> Clientes</a>
+                    <li><a href="#" class="nav-item" data-target="clients"><span class="icon">🏢</span> Clientes</a>
                     </li>
                     <li><a href="#" class="nav-item" data-target="chamados"><span class="icon">🎫</span> Chamados</a>
                     </li>
@@ -31,8 +31,8 @@
                     </li>
                     <li><a href="#" class="nav-item" data-target="assets"><span class="icon">📦</span> Ativos</a></li>
                     <li><a href="#" class="nav-item" data-target="agenda"><span class="icon">📅</span> Agenda</a></li>
-                    <li><a href="#" class="nav-item" data-target="users"><span class="icon">⚙️</span> Usuários</a></li>
-                    <li><a href="#" class="nav-item" data-target="tecnicos"><span class="icon">🔧</span> Técnicos</a>
+                    <li><a href="#" class="nav-item" data-target="users"><span class="icon">👥</span> Usuários</a></li>
+                    <li><a href="#" class="nav-item" data-target="tecnicos"><span class="icon">👨‍🔧</span> Técnicos</a>
                     </li>
                     <li><a href="#" class="nav-item" data-target="especialidades"><span class="icon">⭐</span>
                             Especialidades</a></li>
@@ -91,26 +91,82 @@
             <h2>Chamados Técnicos</h2>
             <button class="btn-primary" onclick="appManager.openChamadoModal()">+ Novo Chamado</button>
         </div>
-        <div class="card">
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Ticket ID</th>
-                            <th>Cliente</th>
-                            <th>Ativo</th>
-                            <th>Nº Série Eq.</th>
-                            <th>Data e Hora</th>
-                            <th>SLA</th>
-                            <th>Status</th>
-                            <th>Urgência</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="chamadosTableBody">
-                        <!-- Loaded dynamically -->
-                    </tbody>
-                </table>
+
+        <div class="card" style="margin-top: 20px;">
+            <div class="tab-nav">
+                <button id="btn-tab-chamados-metrics" class="tab-btn active"
+                    onclick="appManager.switchChamadosTab('metrics')">Indicadores</button>
+                <button id="btn-tab-chamados-list" class="tab-btn"
+                    onclick="appManager.switchChamadosTab('list')">Listagem</button>
+            </div>
+
+            <div id="tab-chamados-metrics-content" class="tab-content active">
+                <div class="kpi-grid" id="chamados-kpi-grid" style="margin-bottom: 20px;">
+                    <!-- Loaded dynamically -->
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="card" style="background: rgba(255,255,255,0.02)">
+                        <h3>Contratos Vencendo no Mês</h3>
+                        <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Contrato</th>
+                                        <th>Cliente</th>
+                                        <th>Vencimento</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="vencimentoMesTableBody">
+                                    <tr>
+                                        <td colspan="3">Carregando...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card" style="background: rgba(255,255,255,0.02)">
+                        <h3>Contratos por SLA</h3>
+                        <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>SLA</th>
+                                        <th>Quantidade</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="contratosSLATableBody">
+                                    <tr>
+                                        <td colspan="2">Carregando...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-chamados-list-content" class="tab-content">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Ticket ID</th>
+                                <th>Cliente</th>
+                                <th>Ativo</th>
+                                <th>Nº Série Eq.</th>
+                                <th>Data e Hora</th>
+                                <th>SLA</th>
+                                <th>Status</th>
+                                <th>Urgência</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="chamadosTableBody">
+                            <!-- Loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -198,6 +254,7 @@
                                 </select>
                             </div>
                         </div>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -398,109 +455,106 @@
                 <button class="btn-primary" onclick="estoqueManager.saveContatoFornecedor()">Salvar Contato</button>
             </div>
         </div>
+    </div>
 
-        <!-- Movement Modal -->
-        <div id="movimentacaoModal" class="modal-overlay" style="z-index: 1200;">
-            <div class="modal-window" style="max-width: 450px;">
-                <div class="modal-header">
-                    <h3>Nova Movimentação de Estoque</h3>
-                    <button class="modal-close" onclick="appManager.closeModal('movimentacaoModal')">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <form id="movimentacaoForm">
-                        <input type="hidden" id="movProdutoId">
-                        <div class="form-group">
-                            <label>Produto</label>
-                            <input type="text" id="movProdutoNome" class="form-control" readonly>
+    <!-- Movement Modal -->
+    <div id="movimentacaoModal" class="modal-overlay" style="z-index: 1200;">
+        <div class="modal-window" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3>Nova Movimentação de Estoque</h3>
+                <button class="modal-close" onclick="appManager.closeModal('movimentacaoModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="movimentacaoForm">
+                    <input type="hidden" id="movProdutoId">
+                    <div class="form-group">
+                        <label>Produto</label>
+                        <input type="text" id="movProdutoNome" class="form-control" readonly>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>Tipo</label>
+                            <select id="movTipo" class="form-control" required>
+                                <option value="E">Entrada (+)</option>
+                                <option value="S">Saída (-)</option>
+                            </select>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group" style="flex:1">
-                                <label>Tipo</label>
-                                <select id="movTipo" class="form-control" required>
-                                    <option value="E">Entrada (+)</option>
-                                    <option value="S">Saída (-)</option>
-                                </select>
-                            </div>
-                            <div class="form-group" style="flex:1">
-                                <label>Quantidade</label>
-                                <input type="number" step="0.001" id="movQtd" class="form-control" required>
-                            </div>
+                        <div class="form-group" style="flex:1">
+                            <label>Quantidade</label>
+                            <input type="number" step="0.001" id="movQtd" class="form-control" required>
                         </div>
-                        <div class="form-group">
-                            <label>Motivo / Observação</label>
-                            <input type="text" id="movMotivo" class="form-control"
-                                placeholder="Ex: Compra fornecedor, Venda cliente">
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn-secondary" onclick="appManager.closeModal('movimentacaoModal')">Cancelar</button>
-                    <button class="btn-primary" onclick="estoqueManager.saveMovimentacao()">Registrar</button>
-                </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Motivo / Observação</label>
+                        <input type="text" id="movMotivo" class="form-control"
+                            placeholder="Ex: Compra fornecedor, Venda cliente">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="appManager.closeModal('movimentacaoModal')">Cancelar</button>
+                <button class="btn-primary" onclick="estoqueManager.saveMovimentacao()">Registrar</button>
             </div>
         </div>
+    </div>
 
-        <!-- Settings View -->
-        <div id="settings-view" class="view-section" style="display: none;">
-            <div class="header-actions">
-                <h2>Configurações do Sistema</h2>
-            </div>
-            <div class="card" style="max-width: 600px; margin-top: 20px;">
-                <h3>Personalização</h3>
-                <div class="form-group" style="margin-top: 20px;">
-                    <label>Logo do Sistema (Login e Barra Lateral)</label>
-                    <div style="display: flex; gap: 20px; align-items: flex-start; margin-top: 10px;">
-                        <div style="border: 1px dashed #ccc; padding: 10px; border-radius: 8px; text-align: center;">
-                            <img id="settingsCurrentLogo" src="logo.png" alt="Logo Atual"
-                                style="max-height: 80px; max-width: 150px; display: block; margin-bottom: 5px;">
-                            <small style="color: var(--text-secondary)">Atual</small>
+    <!-- Settings View -->
+    <div id="settings-view" class="view-section" style="display: none;">
+        <div class="header-actions">
+            <h2>Configurações do Sistema</h2>
+        </div>
+        <div class="card" style="max-width: 600px; margin-top: 20px;">
+            <h3>Personalização</h3>
+            <div class="form-group" style="margin-top: 20px;">
+                <label>Logo do Sistema (Login e Barra Lateral)</label>
+                <div style="display: flex; gap: 20px; align-items: flex-start; margin-top: 10px;">
+                    <div style="border: 1px dashed #ccc; padding: 10px; border-radius: 8px; text-align: center;">
+                        <img id="settingsCurrentLogo" src="logo.png" alt="Logo Atual"
+                            style="max-height: 80px; max-width: 150px; display: block; margin-bottom: 5px;">
+                        <small style="color: var(--text-secondary)">Atual</small>
+                    </div>
+                    <div style="flex: 1;">
+                        <input type="file" id="logoInput" accept="image/*" class="form-control"
+                            style="margin-bottom: 10px;">
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn-primary" onclick="appManager.uploadLogo()">Salvar Logo</button>
+                            <span id="uploadStatus" style="font-size: 0.9rem; align-self: center;"></span>
                         </div>
-                        <div style="flex: 1;">
-                            <input type="file" id="logoInput" accept="image/*" class="form-control"
-                                style="margin-bottom: 10px;">
-                            <div style="display: flex; gap: 10px;">
-                                <button class="btn-primary" onclick="appManager.uploadLogo()">Salvar Logo</button>
-                                <span id="uploadStatus" style="font-size: 0.9rem; align-self: center;"></span>
-                            </div>
-                            <p style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary);">
-                                Recomendado: Imagem PNG ou JPG, fundo transparente.<br>
-                                A imagem será redimensionada automaticamente na exibição.
-                            </p>
-                        </div>
+                        <p style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary);">
+                            Recomendado: Imagem PNG ou JPG, fundo transparente.<br>
+                            A imagem será redimensionada automaticamente na exibição.
+                        </p>
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- Technicians View -->
-        <div id="tecnicos-view" class="view-section" style="display: none;">
-            <div class="header-actions">
-                <h2>Gestão de Técnicos</h2>
-                <button class="btn-primary" onclick="appManager.openTechnicianModal()">Novo Técnico</button>
-            </div>
-            <div class="card">
-                <div class="table-responsive">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Nome</th>
-                                <th>Especialidades</th>
-                                <th>Email</th>
-                                <th>Telefone</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tecnicosTableBody">
-                            <!-- Loaded dynamically -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
     </div>
 
-
+    <!-- Technicians View -->
+    <div id="tecnicos-view" class="view-section" style="display: none;">
+        <div class="header-actions">
+            <h2>Gestão de Técnicos</h2>
+            <button class="btn-primary" onclick="appManager.openTechnicianModal()">Novo Técnico</button>
+        </div>
+        <div class="card">
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Especialidades</th>
+                            <th>Email</th>
+                            <th>Telefone</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tecnicosTableBody">
+                        <!-- Loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 
     <!-- Report Filter Modal (Generic for now, mainly for Client Selection) -->
     <div id="reportFilterModal" class="modal-overlay">
@@ -829,7 +883,6 @@
             </div>
         </div>
     </div>
-    </div>
 
     <!-- Agenda Modal -->
     <div id="agendaModal" class="modal-overlay">
@@ -1139,6 +1192,64 @@
             </div>
             <div class="modal-footer">
                 <button class="btn-primary" onclick="appManager.closeModal('dashboardDetailModal')">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Perfil Modal -->
+    <div id="perfilModal" class="modal-overlay">
+        <div class="modal-window" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 id="perfilModalTitle">Novo Perfil</h3>
+                <button class="modal-close" onclick="appManager.closeModal('perfilModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="perfilForm">
+                    <input type="hidden" id="perfilId">
+                    <div class="form-group">
+                        <label>Nome do Perfil</label>
+                        <input type="text" id="perfilName" class="form-control" required
+                            placeholder="Ex: Técnico, Administrativo...">
+                    </div>
+
+                    <div style="margin-top: 20px;">
+                        <label style="font-weight: 600; margin-bottom: 10px; display: block;">Permissões de Acesso ao
+                            Menu</label>
+                        <div class="permissions-grid"
+                            style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-height: 300px; overflow-y: auto; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input
+                                    type="checkbox" id="perm_CAN_DASHBOARD" checked> Dashboard</label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input
+                                    type="checkbox" id="perm_CAN_CLIENTS" checked> Clientes</label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input
+                                    type="checkbox" id="perm_CAN_CHAMADOS" checked> Chamados</label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input
+                                    type="checkbox" id="perm_CAN_CONTRACTS" checked> Contratos</label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input
+                                    type="checkbox" id="perm_CAN_ASSETS" checked> Ativos</label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input
+                                    type="checkbox" id="perm_CAN_AGENDA" checked> Agenda</label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input
+                                    type="checkbox" id="perm_CAN_USERS" checked> Usuários</label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input
+                                    type="checkbox" id="perm_CAN_TECNICOS" checked> Técnicos</label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input
+                                    type="checkbox" id="perm_CAN_ESPECIALIDADES" checked> Especialidades</label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input
+                                    type="checkbox" id="perm_CAN_ESTOQUE" checked> Estoque</label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input
+                                    type="checkbox" id="perm_CAN_FORNECEDORES" checked> Fornecedores</label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input
+                                    type="checkbox" id="perm_CAN_REPORTS" checked> Relatórios</label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input
+                                    type="checkbox" id="perm_CAN_SETTINGS" checked> Configurações</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="appManager.closeModal('perfilModal')">Cancelar</button>
+                <button class="btn-primary" onclick="appManager.savePerfil()">Salvar Perfil</button>
             </div>
         </div>
     </div>

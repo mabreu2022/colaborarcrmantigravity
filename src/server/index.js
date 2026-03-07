@@ -946,10 +946,29 @@ app.get('/api/perfis', async (req, res) => {
  *         description: Profile created successfully.
  */
 app.post('/api/perfis', async (req, res) => {
-
     const { NOME } = req.body;
+    const permissions = req.body;
+    const permissionCols = [
+        'CAN_DASHBOARD', 'CAN_CLIENTS', 'CAN_CHAMADOS', 'CAN_CONTRACTS',
+        'CAN_ASSETS', 'CAN_AGENDA', 'CAN_USERS', 'CAN_TECNICOS',
+        'CAN_ESPECIALIDADES', 'CAN_ESTOQUE', 'CAN_FORNECEDORES',
+        'CAN_REPORTS', 'CAN_SETTINGS'
+    ];
+
     try {
-        const result = await db.query('INSERT INTO PERFIS (NOME) VALUES (?) RETURNING ID_PERFIL', [NOME]);
+        let cols = ['NOME'];
+        let values = [NOME];
+
+        permissionCols.forEach(col => {
+            if (permissions[col] !== undefined) {
+                cols.push(col);
+                values.push(permissions[col]);
+            }
+        });
+
+        const placeholders = cols.map(() => '?').join(',');
+        const query = `INSERT INTO PERFIS (${cols.join(', ')}) VALUES (${placeholders}) RETURNING ID_PERFIL`;
+        const result = await db.query(query, values);
         res.json({ success: true, id: result.ID_PERFIL });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -979,11 +998,30 @@ app.post('/api/perfis', async (req, res) => {
  *         description: Profile updated successfully.
  */
 app.put('/api/perfis/:id', async (req, res) => {
-
     const { id } = req.params;
     const { NOME } = req.body;
+    const permissions = req.body;
+    const permissionCols = [
+        'CAN_DASHBOARD', 'CAN_CLIENTS', 'CAN_CHAMADOS', 'CAN_CONTRACTS',
+        'CAN_ASSETS', 'CAN_AGENDA', 'CAN_USERS', 'CAN_TECNICOS',
+        'CAN_ESPECIALIDADES', 'CAN_ESTOQUE', 'CAN_FORNECEDORES',
+        'CAN_REPORTS', 'CAN_SETTINGS'
+    ];
+
     try {
-        await db.query('UPDATE PERFIS SET NOME=? WHERE ID_PERFIL=?', [NOME, id]);
+        let sets = ['NOME = ?'];
+        let values = [NOME];
+
+        permissionCols.forEach(col => {
+            if (permissions[col] !== undefined) {
+                sets.push(`${col} = ?`);
+                values.push(permissions[col]);
+            }
+        });
+
+        values.push(id);
+        const query = `UPDATE PERFIS SET ${sets.join(', ')} WHERE ID_PERFIL = ?`;
+        await db.query(query, values);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1071,7 +1109,12 @@ app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     try {
         // Simple plain text check as per existing DB
-        const query = `SELECT * FROM USUARIOS WHERE EMAIL = ? AND SENHA = ?`;
+        const query = `
+            SELECT U.*, P.*
+            FROM USUARIOS U
+            LEFT JOIN PERFIS P ON U.ID_PERFIL = P.ID_PERFIL
+            WHERE U.EMAIL = ? AND U.SENHA = ?
+        `;
         const result = await db.query(query, [email, password]);
 
         if (result.length > 0) {
@@ -2232,6 +2275,54 @@ app.get('/api/sla', async (req, res) => {
 });
 
 // --- CHAMADOS API ---
+
+/**
+ * @openapi
+ * /api/chamados/dashboard:
+ *   get:
+ *     summary: Get metrics for tickets dashboard
+ */
+app.get('/api/chamados/dashboard', async (req, res) => {
+    try {
+        const now = new Date();
+        const month = now.getMonth() + 1;
+        const year = now.getFullYear();
+
+        const queries = {
+            totalChamados: 'SELECT COUNT(*) as QTD FROM CHAMADOS',
+            contratosAtivos: 'SELECT COUNT(*) as QTD FROM CONTRATOS WHERE ID_STATUS = 1',
+            totalContratos: 'SELECT COUNT(*) as QTD FROM CONTRATOS',
+            ativosStatus: 'SELECT S.STATUS, COUNT(A.ID_ATIVO) as QTD FROM ATIVOS A LEFT JOIN "STATUS" S ON A.ID_STATUS = S.ID_STATUS GROUP BY S.STATUS',
+            contratosSLA: 'SELECT S.SLDESC, COUNT(C.ID_CONTRATO) as QTD FROM CONTRATOS C LEFT JOIN SLA S ON C.SLAID = S.ID_SLA GROUP BY S.SLDESC',
+            vencimentoMes: `
+                SELECT C.ID_CONTRATO, C.DESCRICAO, CL.NOME_RAZAO as CLIENTE_NOME, C.DATA_FIM 
+                FROM CONTRATOS C 
+                LEFT JOIN CLIENTES CL ON C.ID_CLIENTE = CL.ID_CLIENTE 
+                WHERE EXTRACT(MONTH FROM C.DATA_FIM) = ? AND EXTRACT(YEAR FROM C.DATA_FIM) = ?
+            `
+        };
+
+        const results = await Promise.all([
+            db.query(queries.totalChamados),
+            db.query(queries.contratosAtivos),
+            db.query(queries.totalContratos),
+            db.query(queries.ativosStatus),
+            db.query(queries.contratosSLA),
+            db.query(queries.vencimentoMes, [month, year])
+        ]);
+
+        res.json({
+            totalChamados: results[0][0].QTD,
+            contratosAtivos: results[1][0].QTD,
+            totalContratos: results[2][0].QTD,
+            ativosStatus: results[3],
+            contratosSLA: results[4],
+            vencimentoMes: results[5]
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
 /**
  * @openapi

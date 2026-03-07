@@ -43,6 +43,31 @@ class AppManager {
             const avatarEl = document.querySelector('.avatar');
             if (avatarEl) avatarEl.textContent = '?';
         }
+
+        if (user) {
+            this.enforcePermissions(user);
+        }
+    }
+
+    enforcePermissions(user) {
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(item => {
+            const target = item.dataset.target;
+            if (!target) return;
+
+            // Map target to permission column
+            const permissionKey = `CAN_${target.toUpperCase()}`;
+
+            if (user[permissionKey] === 0) {
+                item.style.display = 'none';
+                // If user is on a forbidden page, redirect to dashboard or first allowed
+                if (this.currentPage === target) {
+                    this.loadPage('dashboard');
+                }
+            } else {
+                item.style.display = 'flex';
+            }
+        });
     }
 
     logout() {
@@ -78,6 +103,7 @@ class AppManager {
     }
 
     async loadPage(page) {
+        this.currentPage = page;
         const contentArea = document.getElementById('content-area');
         const breadcrumbs = document.querySelector('.breadcrumbs');
         if (breadcrumbs) {
@@ -426,44 +452,289 @@ class AppManager {
     }
 
     renderUsers(data) {
-        let table = `
-            <div class="card">
-                 <div class="card-header">
-                    <h2>Usuários</h2>
-                    <button class="btn-primary" onclick="appManager.openUserModal()">Novo Usuário</button>
+        const contentArea = document.getElementById('content-area');
+        contentArea.innerHTML = `
+            <div class="header-actions">
+                <h2>Gestão de Acesso</h2>
+            </div>
+            <div class="card" style="margin-top: 20px;">
+                <div class="tab-nav">
+                    <button id="btn-tab-users" class="tab-btn active" onclick="appManager.switchUserTab('users')">Usuários</button>
+                    <button id="btn-tab-perfis" class="tab-btn" onclick="appManager.switchUserTab('perfis')">Perfis e Direitos</button>
                 </div>
-                <div class="table-responsive"><table class="data-table"><thead><tr>
-                <th>ID</th><th>Nome</th><th>Email</th><th>Perfil</th><th>Ações</th>
-                </tr></thead><tbody>
-        `;
-        data.forEach(item => {
+                
+                <div id="tab-users-content" class="tab-content active">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+                        <h3>Lista de Usuários</h3>
+                        <button class="btn-primary" onclick="appManager.openUserModal()">Novo Usuário</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th><th>Nome</th><th>Email</th><th>Perfil</th><th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.map(item => {
             const itemData = encodeURIComponent(JSON.stringify(item));
-            table += `<tr>
-                <td>${item.ID_USUARIO}</td>
-                <td>${item.NOME}</td>
-                <td>${item.EMAIL}</td>
-                <td>${item.PERFIL || '-'}</td>
-                <td>
-                    <button class="btn-icon" onclick="appManager.openUserModal('${itemData}')">✏️</button>
-                    <button class="btn-icon" onclick="appManager.deleteUser(${item.ID_USUARIO})">🗑️</button>
-                </td>
-            </tr>`;
+            return `<tr>
+                                        <td>${item.ID_USUARIO}</td>
+                                        <td>${item.NOME}</td>
+                                        <td>${item.EMAIL}</td>
+                                        <td>${item.PERFIL || '-'}</td>
+                                        <td>
+                                            <button class="btn-icon" onclick="appManager.openUserModal('${itemData}')">✏️</button>
+                                            <button class="btn-icon" onclick="appManager.deleteUser(${item.ID_USUARIO})">🗑️</button>
+                                        </td>
+                                    </tr>`;
+        }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="tab-perfis-content" class="tab-content">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+                        <h3>Perfis de Acesso</h3>
+                        <button class="btn-primary" onclick="appManager.openPerfilModal()">Novo Perfil</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th><th>Nome</th><th>Direitos Habilitados</th><th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="perfisTableBody">
+                                <tr><td colspan="4">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    switchUserTab(tab) {
+        const usersContent = document.getElementById('tab-users-content');
+        const perfisContent = document.getElementById('tab-perfis-content');
+        const btnUsers = document.getElementById('btn-tab-users');
+        const btnPerfis = document.getElementById('btn-tab-perfis');
+
+        if (tab === 'users') {
+            usersContent.classList.add('active');
+            perfisContent.classList.remove('active');
+            btnUsers.classList.add('active');
+            btnPerfis.classList.remove('active');
+        } else {
+            usersContent.classList.remove('active');
+            perfisContent.classList.add('active');
+            btnUsers.classList.remove('active');
+            btnPerfis.classList.add('active');
+            this.loadPerfis();
+        }
+    }
+
+    async loadPerfis() {
+        const tbody = document.getElementById('perfisTableBody');
+        try {
+            const res = await fetch('api/perfis');
+            const data = await res.json();
+            this.perfisData = data;
+
+            tbody.innerHTML = data.map(p => {
+                const pData = encodeURIComponent(JSON.stringify(p));
+                // Count enabled permissions
+                const perms = Object.keys(p).filter(key => key.startsWith('CAN_') && p[key] === 1).length;
+
+                return `
+                    <tr>
+                        <td>${p.ID_PERFIL}</td>
+                        <td><strong>${p.NOME}</strong></td>
+                        <td><span class="badge" style="background:var(--secondary-color)">${perms} módulos</span></td>
+                        <td>
+                            <button class="btn-icon" onclick="appManager.openPerfilModal('${pData}')">✏️</button>
+                            <button class="btn-icon" onclick="appManager.deletePerfil(${p.ID_PERFIL})">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="4">Erro ao carregar perfis.</td></tr>';
+        }
+    }
+
+    openPerfilModal(perfilData = null) {
+        const modal = document.getElementById('perfilModal');
+        const form = document.getElementById('perfilForm');
+        const title = document.getElementById('perfilModalTitle');
+
+        form.reset();
+        document.getElementById('perfilId').value = '';
+
+        // Reset permissions to checked by default
+        const checkboxes = document.querySelectorAll('#perfilForm input[type="checkbox"]');
+        checkboxes.forEach(cb => cb.checked = true);
+
+        if (perfilData) {
+            const p = JSON.parse(decodeURIComponent(perfilData));
+            title.textContent = 'Editar Perfil';
+            document.getElementById('perfilId').value = p.ID_PERFIL;
+            document.getElementById('perfilName').value = p.NOME;
+
+            checkboxes.forEach(cb => {
+                const key = cb.id.replace('perm_', '');
+                cb.checked = p[key] === 1;
+            });
+        } else {
+            title.textContent = 'Novo Perfil';
+        }
+        modal.classList.add('active');
+    }
+
+    async savePerfil() {
+        const id = document.getElementById('perfilId').value;
+        const NOME = document.getElementById('perfilName').value;
+        if (!NOME) return alert('Nome é obrigatório');
+
+        const data = { NOME };
+        const checkboxes = document.querySelectorAll('#perfilForm input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+            const key = cb.id.replace('perm_', '');
+            data[key] = cb.checked ? 1 : 0;
         });
-        table += '</tbody></table></div></div>';
-        document.getElementById('content-area').innerHTML = table;
+
+        try {
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `api/perfis/${id}` : 'api/perfis';
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                this.closeModal('perfilModal');
+                this.loadPerfis();
+                alert('Perfil salvo com sucesso!');
+            } else {
+                alert('Erro ao salvar perfil.');
+            }
+        } catch (e) {
+            alert('Erro: ' + e.message);
+        }
+    }
+
+    async deletePerfil(id) {
+        if (!confirm('Excluir este perfil? Usuários vinculados podem perder acesso.')) return;
+        try {
+            const res = await fetch(`api/perfis/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                this.loadPerfis();
+            } else {
+                alert('Erro ao excluir perfil. Verifique se existem usuários vinculados.');
+            }
+        } catch (e) {
+            alert('Erro: ' + e.message);
+        }
     }
 
     // --- CHAMADOS CRUD ---
     async loadChamados() {
-        try {
-            const response = await fetch('api/chamados');
-            if (!response.ok) throw new Error('Erro ao carregar chamados');
-            const data = await response.json();
-            this.renderChamados(data);
-        } catch (error) {
-            console.error(error);
-            this.showError('Erro ao carregar chamados', error.message);
+        const contentArea = document.getElementById('content-area');
+        contentArea.innerHTML = document.getElementById('chamados-view').innerHTML;
+        this.switchChamadosTab('metrics');
+    }
+
+    switchChamadosTab(tab) {
+        const metricsContent = document.getElementById('tab-chamados-metrics-content');
+        const listContent = document.getElementById('tab-chamados-list-content');
+        const btnMetrics = document.getElementById('btn-tab-chamados-metrics');
+        const btnList = document.getElementById('btn-tab-chamados-list');
+
+        if (!metricsContent || !listContent) return;
+
+        if (tab === 'metrics') {
+            metricsContent.classList.add('active');
+            listContent.classList.remove('active');
+            btnMetrics.classList.add('active');
+            btnList.classList.remove('active');
+            this.loadChamadosDashboard();
+        } else {
+            metricsContent.classList.remove('active');
+            listContent.classList.add('active');
+            btnMetrics.classList.remove('active');
+            btnList.classList.add('active');
+            this.loadChamadosList();
         }
+    }
+
+    async loadChamadosDashboard() {
+        const kpiGrid = document.getElementById('chamados-kpi-grid');
+        const vencimentoMesTable = document.getElementById('vencimentoMesTableBody');
+        const slaTable = document.getElementById('contratosSLATableBody');
+
+        try {
+            const res = await fetch('api/chamados/dashboard');
+            if (!res.ok) throw new Error('Erro ao buscar dados do dashboard');
+            const data = await res.json();
+
+            const ativosStatus = data.ativosStatus || [];
+            const locados = ativosStatus.find(s => s.STATUS === 'Locado')?.QTD || 0;
+            const estoque = ativosStatus.find(s => s.STATUS === 'Estoque')?.QTD || 0;
+            const manutencao = ativosStatus.find(s => (s.STATUS || '').includes('Manutenção'))?.QTD || 0;
+
+            if (kpiGrid) {
+                kpiGrid.innerHTML = `
+                    <div class="kpi-card" style="border-left: 4px solid var(--primary-color)">
+                        <div class="kpi-title">Chamados Totais</div>
+                        <div class="kpi-value">${data.totalChamados || 0}</div>
+                    </div>
+                    <div class="kpi-card" style="border-left: 4px solid var(--secondary-color)">
+                        <div class="kpi-title">Contratos Ativos</div>
+                        <div class="kpi-value">${data.contratosAtivos || 0} <small style="font-size:0.5em; opacity:0.6">/ ${data.totalContratos || 0}</small></div>
+                    </div>
+                    <div class="kpi-card" style="border-left: 4px solid #4f46e5">
+                        <div class="kpi-title">Equip. Locados</div>
+                        <div class="kpi-value">${locados}</div>
+                    </div>
+                     <div class="kpi-card" style="border-left: 4px solid #f59e0b">
+                        <div class="kpi-title">Estoque / Manutenção</div>
+                        <div class="kpi-value">${estoque} <small style="font-size:0.5em; opacity:0.6">/</small> ${manutencao}</div>
+                    </div>
+                `;
+            }
+
+            if (vencimentoMesTable) {
+                vencimentoMesTable.innerHTML = data.vencimentoMes && data.vencimentoMes.length > 0
+                    ? data.vencimentoMes.map(c => `
+                        <tr>
+                            <td><strong>${c.DESCRICAO || 'S/D'}</strong></td>
+                            <td>${c.CLIENTE_NOME || '-'}</td>
+                            <td style="color:#f59e0b; font-weight:bold">${new Date(c.DATA_FIM).toLocaleDateString('pt-BR')}</td>
+                        </tr>
+                    `).join('')
+                    : '<tr><td colspan="3" style="text-align:center; padding: 20px;">Nenhum contrato vencendo este mês.</td></tr>';
+            }
+
+            if (slaTable) {
+                slaTable.innerHTML = data.contratosSLA && data.contratosSLA.length > 0
+                    ? data.contratosSLA.map(s => `
+                        <tr>
+                            <td>${s.SLDESC || 'Sem SLA'}</td>
+                            <td><span class="badge" style="background:var(--primary-color)">${s.QTD} contratos</span></td>
+                        </tr>
+                    `).join('')
+                    : '<tr><td colspan="2" style="text-align:center; padding: 20px;">Nenhum dado de SLA.</td></tr>';
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async loadChamadosList() {
+        const response = await fetch('api/chamados');
+        const data = await response.json();
+        this.renderChamados(data);
     }
 
     async openChamadoModal(chamadoData = null) {
@@ -577,69 +848,45 @@ class AppManager {
     }
 
     renderChamados(data) {
-        const contentArea = document.getElementById('content-area');
+        const tbody = document.getElementById('chamadosTableBody');
+        if (!tbody) return;
 
-        // Re-use the layout defined in index.html (or re-generate)
-        // Since loadPage overrides content-area, we must recreate the HTML
-        let tableHtml = `
-            <div class="header-actions" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
-                <h2>Chamados Técnicos</h2>
-                <button class="btn-primary" onclick="appManager.openChamadoModal()">+ Novo Chamado</button>
-            </div>
-            <div class="card">
-                <div class="table-responsive">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Ticket ID</th>
-                                <th>Cliente</th>
-                                <th>Ativo</th>
-                                <th>Nº Série Eq.</th>
-                                <th>Data e Hora</th>
-                                <th>SLA</th>
-                                <th>Status</th>
-                                <th>Urgência</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 1rem;">Nenhum chamado encontrado.</td></tr>';
+            return;
+        }
 
-        if (data.length === 0) {
-            tableHtml += '<tr><td colspan="9" style="text-align:center; padding: 1rem;">Nenhum chamado encontrado.</td></tr>';
-        } else {
-            data.forEach(item => {
-                const dataStr = encodeURIComponent(JSON.stringify(item));
-                const dataHora = item.DATA_HORA ? new Date(item.DATA_HORA).toLocaleString('pt-BR') : '-';
+        tbody.innerHTML = data.map(item => {
+            const dataStr = encodeURIComponent(JSON.stringify(item));
+            const dataHora = item.DATA_HORA ? new Date(item.DATA_HORA).toLocaleString('pt-BR') : '-';
 
-                // Translate Urgency
-                let urgLabel = 'Média';
-                if (item.URGENCIA === 'low') urgLabel = 'Baixa';
-                if (item.URGENCIA === 'high') urgLabel = 'Alta';
+            let urgLabel = 'Média';
+            let urgColor = '#f59e0b';
+            if (item.URGENCIA === 'low') { urgLabel = 'Baixa'; urgColor = '#10b981'; }
+            if (item.URGENCIA === 'high') { urgLabel = 'Alta'; urgColor = '#ef4444'; }
 
-                tableHtml += `<tr>
+            let statusColor = 'var(--primary-color)';
+            if (item.STATUS_NOME === 'Concluído') statusColor = '#10b981';
+            if (item.STATUS_NOME === 'Aberto') statusColor = '#ef4444';
+            if (item.STATUS_NOME === 'Em Atendimento') statusColor = '#f59e0b';
+
+            return `
+                <tr>
                     <td><strong>${item.TICKETID || '-'}</strong></td>
                     <td>${item.CLIENTE_NOME || '-'}</td>
                     <td>${item.ATIVO_NOME || '-'}</td>
                     <td>${item.NUMERO_SERIE || '-'}</td>
                     <td>${dataHora}</td>
-                    <td><span class="badge">${item.SLA_DESC || '-'}</span></td>
-                    <td><span class="badge">${item.STATUS_NOME || 'Aberto'}</span></td>
-                    <td><span class="badge">${urgLabel}</span></td>
+                    <td><span class="badge" style="background:#4f46e5">${item.SLA_DESC || '-'}</span></td>
+                    <td><span class="badge" style="background:${statusColor}">${item.STATUS_NOME || 'Aberto'}</span></td>
+                    <td><span class="badge" style="background:${urgColor}">${urgLabel}</span></td>
                     <td>
                         <button class="btn-icon" onclick="appManager.openChamadoModal('${dataStr}')">✏️</button>
                         <button class="btn-icon" onclick="appManager.deleteChamado(${item.ID_CHAMADO})">🗑️</button>
                     </td>
-                </tr>`;
-            });
-        }
-
-        tableHtml += `
-                        </tbody>
-                    </table>
-                </div>
-            </div>`;
-
-        contentArea.innerHTML = tableHtml;
+                </tr>
+            `;
+        }).join('');
     }
 
     // Helper methods to reduce duplication
@@ -1827,44 +2074,57 @@ class AppManager {
 
 
     openClientModal(clientData = null) {
+        console.log("Opening Client Modal, data present:", !!clientData);
         const modal = document.getElementById('clientModal');
         const title = document.getElementById('modalTitle');
         const form = document.getElementById('clientForm');
+
+        if (!modal || !form) {
+            console.error("Client modal elements not found!");
+            return;
+        }
 
         form.reset();
         document.getElementById('clientId').value = '';
 
         // Reset Tabs
         this.switchClientTab('basics');
-        document.getElementById('clientContactsBody').innerHTML = ''; // Clear previous contacts
+        document.getElementById('clientContactsBody').innerHTML = '';
 
         if (clientData) {
-            const client = JSON.parse(decodeURIComponent(clientData));
+            try {
+                const client = JSON.parse(decodeURIComponent(clientData));
+                console.log("Editing client:", client.ID_CLIENTE);
 
-            // FIX: Force trim and uppercase on frontend to ensure dropdowns match
-            // This handles cases where server-side trim might not have deployed yet
-            client.TIPO_PESSOA = (client.TIPO_PESSOA || '').trim().toUpperCase();
-            client.UF = (client.UF || '').trim().toUpperCase();
+                // FIX: Force trim and uppercase on frontend to ensure dropdowns match
+                // This handles cases where server-side trim might not have deployed yet
+                client.TIPO_PESSOA = (client.TIPO_PESSOA || '').trim().toUpperCase();
+                client.UF = (client.UF || '').trim().toUpperCase();
 
-            title.textContent = 'Editar Cliente';
-            document.getElementById('clientId').value = client.ID_CLIENTE;
-            document.getElementById('clientName').value = client.NOME_RAZAO;
-            document.getElementById('clientFantasy').value = client.NOME_FANTASIA || '';
-            document.getElementById('clientType').value = client.TIPO_PESSOA || 'F';
-            document.getElementById('clientCpfCnpj').value = client.CPF_CNPJ || '';
-            document.getElementById('clientIE').value = client.IE || '';
-            document.getElementById('clientEmail').value = client.EMAIL || '';
-            document.getElementById('clientPhone').value = client.TELEFONE || '';
-            document.getElementById('clientAddress').value = client.ENDERECO || '';
-            document.getElementById('clientNumber').value = client.NUMERO || '';
-            document.getElementById('clientComplement').value = client.COMPLEMENTO || '';
-            document.getElementById('clientNeighborhood').value = client.BAIRRO || '';
-            document.getElementById('clientZip').value = client.CEP || '';
-            document.getElementById('clientCity').value = client.MUNICIPIO || '';
-            document.getElementById('clientState').value = client.UF || '';
+                title.textContent = 'Editar Cliente';
+                document.getElementById('clientId').value = client.ID_CLIENTE;
+                document.getElementById('clientName').value = client.NOME_RAZAO;
+                document.getElementById('clientFantasy').value = client.NOME_FANTASIA || '';
+                document.getElementById('clientType').value = client.TIPO_PESSOA || 'F';
+                document.getElementById('clientCpfCnpj').value = client.CPF_CNPJ || '';
+                document.getElementById('clientIE').value = client.IE || '';
+                document.getElementById('clientEmail').value = client.EMAIL || '';
+                document.getElementById('clientPhone').value = client.TELEFONE || '';
+                document.getElementById('clientAddress').value = client.ENDERECO || '';
+                document.getElementById('clientNumber').value = client.NUMERO || '';
+                document.getElementById('clientComplement').value = client.COMPLEMENTO || '';
+                document.getElementById('clientNeighborhood').value = client.BAIRRO || '';
+                document.getElementById('clientZip').value = client.CEP || '';
+                document.getElementById('clientCity').value = client.MUNICIPIO || '';
+                document.getElementById('clientState').value = client.UF || '';
 
-            // Load Contacts
-            this.loadClientContacts(client.ID_CLIENTE);
+                // Load Contacts
+                this.loadClientContacts(client.ID_CLIENTE);
+            } catch (e) {
+                console.error("Error parsing client data:", e);
+                this.showError('Erro ao abrir cliente', 'Falha ao processar dados do registro.');
+                return;
+            }
         } else {
             title.textContent = 'Novo Cliente';
         }
@@ -1878,6 +2138,8 @@ class AppManager {
         const tabContacts = document.getElementById('tab-client-contacts');
         const buttons = document.querySelectorAll('.tab-nav .tab-btn');
 
+        if (!tabBasics || !tabContacts) return;
+
         // Hide all
         tabBasics.classList.remove('active');
         tabContacts.classList.remove('active');
@@ -1885,15 +2147,16 @@ class AppManager {
 
         if (tabName === 'basics') {
             tabBasics.classList.add('active');
-            buttons[0].classList.add('active'); // First button is Basics
+            if (buttons[0]) buttons[0].classList.add('active');
         } else {
             tabContacts.classList.add('active');
-            buttons[1].classList.add('active'); // Second button is Contacts
+            if (buttons[1]) buttons[1].classList.add('active');
         }
     }
 
     async loadClientContacts(clientId) {
         const tbody = document.getElementById('clientContactsBody');
+        if (!tbody) return;
         tbody.innerHTML = '<tr><td colspan="5" class="loading">Carregando contatos...</td></tr>';
 
         try {
@@ -2525,10 +2788,16 @@ class AppManager {
     }
 
     async openTechnicianModal(id = null) {
+        console.log("Opening Technician Modal, ID:", id);
         const modal = document.getElementById('technicianModal');
         const form = document.getElementById('technicianForm');
         const title = document.getElementById('technicianModalTitle');
         const container = document.getElementById('techSpecialtiesContainer');
+
+        if (!modal || !form) {
+            console.error("Technician modal elements not found!");
+            return;
+        }
 
         form.reset();
         document.getElementById('techId').value = '';
