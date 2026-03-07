@@ -490,11 +490,14 @@ app.get('/api/contratos', async (req, res) => {
                 C.VALOR_MENSAL,
                 C.ID_STATUS,
                 S.NOME as STATUS_NOME,
+                C.SLAID,
+                SLA.SLDESC as SLA_NOME,
                 C.DESCRICAO,
                 C.OBSERVACOES
             FROM CONTRATOS C
             LEFT JOIN CLIENTES CL ON C.ID_CLIENTE = CL.ID_CLIENTE
             LEFT JOIN STATUS_CONTRATO S ON C.ID_STATUS = S.ID_STATUS
+            LEFT JOIN SLA ON C.SLAID = SLA.ID_SLA
         `;
         const result = await db.query(query);
 
@@ -549,15 +552,15 @@ app.get('/api/contratos', async (req, res) => {
  */
 app.post('/api/contratos', async (req, res) => {
 
-    const { ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, DESCRICAO, OBSERVACOES } = req.body;
+    const { ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, SLAID, DESCRICAO, OBSERVACOES } = req.body;
     console.log("POST /api/contratos Payload:", req.body); // Debug Log
     try {
         const query = `
-            INSERT INTO CONTRATOS (ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, DESCRICAO, OBSERVACOES)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO CONTRATOS (ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, SLAID, DESCRICAO, OBSERVACOES)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING ID_CONTRATO
         `;
-        const result = await db.query(query, [ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, DESCRICAO, OBSERVACOES]);
+        const result = await db.query(query, [ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, SLAID || null, DESCRICAO, OBSERVACOES]);
         console.log("Insert Result:", result); // Debug Log
         res.json({ success: true, id: result.ID_CONTRATO });
     } catch (error) {
@@ -591,14 +594,14 @@ app.post('/api/contratos', async (req, res) => {
 app.put('/api/contratos/:id', async (req, res) => {
 
     const { id } = req.params;
-    const { ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, DESCRICAO, OBSERVACOES } = req.body;
+    const { ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, SLAID, DESCRICAO, OBSERVACOES } = req.body;
     try {
         const query = `
             UPDATE CONTRATOS 
-            SET ID_CLIENTE = ?, DATA_INICIO = ?, DATA_FIM = ?, VALOR_MENSAL = ?, ID_STATUS = ?, DESCRICAO = ?, OBSERVACOES = ?
+            SET ID_CLIENTE = ?, DATA_INICIO = ?, DATA_FIM = ?, VALOR_MENSAL = ?, ID_STATUS = ?, SLAID = ?, DESCRICAO = ?, OBSERVACOES = ?
             WHERE ID_CONTRATO = ?
         `;
-        await db.query(query, [ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, DESCRICAO, OBSERVACOES, id]);
+        await db.query(query, [ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, SLAID || null, DESCRICAO, OBSERVACOES, id]);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -2213,6 +2216,189 @@ app.delete('/api/contatos-fornecedor/:id', async (req, res) => {
         await db.query('DELETE FROM CONTATOS_FORNECEDOR WHERE ID_CONTATO = ?', [id]);
         res.json({ success: true });
     } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+// --- SLA API ---
+app.get('/api/sla', async (req, res) => {
+    try {
+        const result = await db.query('SELECT * FROM SLA ORDER BY SLDESC');
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// --- CHAMADOS API ---
+
+/**
+ * @openapi
+ * /api/chamados:
+ *   get:
+ *     summary: Get all tickets 
+ */
+app.get('/api/chamados', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                C.ID_CHAMADO,
+                C.TICKETID,
+                C.CODCLIENTE,
+                CL.NOME_RAZAO as CLIENTE_NOME,
+                C.NUMERO_SERIE,
+                C.DATA_HORA,
+                C.SLAID,
+                SLA.SLDESC as SLA_DESC,
+                C.ID_STATUS,
+                S.STATUS as STATUS_NOME,
+                C.URGENCIA,
+                C.ID_CONTATO,
+                CO.NOME_CONTATO as CONTATO_NOME,
+                C.ID_ATIVO,
+                ATV.DESCRICAO as ATIVO_NOME,
+                C.ID_TECNICO,
+                T.NOME as TECNICO_NOME,
+                C.DESCRICAO
+            FROM CHAMADOS C
+            LEFT JOIN CLIENTES CL ON C.CODCLIENTE = CL.ID_CLIENTE
+            LEFT JOIN SLA ON C.SLAID = SLA.ID_SLA
+            LEFT JOIN STATUS S ON C.ID_STATUS = S.ID_STATUS
+            LEFT JOIN CONTATOS CO ON C.ID_CONTATO = CO.ID_CONTATO
+            LEFT JOIN ATIVOS ATV ON C.ID_ATIVO = ATV.ID_ATIVO
+            LEFT JOIN TECNICOS T ON C.ID_TECNICO = T.ID_TECNICO
+            ORDER BY C.DATA_HORA DESC
+        `;
+        const result = await db.query(query);
+
+        const processBlob = (blob) => {
+            return new Promise((resolve, reject) => {
+                if (!blob) return resolve('');
+                if (Buffer.isBuffer(blob)) return resolve(blob.toString());
+                if (typeof blob === 'function') {
+                    blob((err, name, eventEmitter) => {
+                        if (err) return reject(err);
+                        let data = '';
+                        eventEmitter.on('data', chunk => data += chunk.toString());
+                        eventEmitter.on('end', () => resolve(data));
+                        eventEmitter.on('error', reject);
+                    });
+                } else {
+                    resolve(blob.toString());
+                }
+            });
+        };
+
+        const parsedResult = await Promise.all(result.map(async row => ({
+            ...row,
+            DESCRICAO: await processBlob(row.DESCRICAO)
+        })));
+
+        res.json(parsedResult);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @openapi
+ * /api/chamados:
+ *   post:
+ *     summary: Create a ticket
+ */
+app.post('/api/chamados', async (req, res) => {
+    // Note: Ticket ID will be generated
+    const {
+        CODCLIENTE, NUMERO_SERIE, SLAID,
+        DESCRICAO, URGENCIA, ID_STATUS,
+        ID_CONTATO, ID_ATIVO, ID_TECNICO
+    } = req.body;
+
+    // Default Status = 1 if none provided
+    const statusVal = ID_STATUS || 1;
+
+    try {
+        const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+        let uniqueID = '$';
+        for (let i = 0; i < 8; i++) {
+            uniqueID += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+
+        const query = `
+            INSERT INTO CHAMADOS (
+                TICKETID, CODCLIENTE, NUMERO_SERIE, SLAID, DATA_HORA,
+                DESCRICAO, URGENCIA, ID_STATUS, ID_CONTATO, ID_ATIVO, ID_TECNICO
+            )
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?)
+            RETURNING ID_CHAMADO
+        `;
+        const result = await db.query(query, [
+            uniqueID,
+            CODCLIENTE || null,
+            NUMERO_SERIE || null,
+            SLAID || null,
+            DESCRICAO || null,
+            URGENCIA || 'medium',
+            statusVal,
+            ID_CONTATO || null,
+            ID_ATIVO || null,
+            ID_TECNICO || null
+        ]);
+
+        res.json({ success: true, id: result.ID_CHAMADO, ticketId: uniqueID });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @openapi
+ * /api/chamados/{id}:
+ *   put:
+ *     summary: Update a ticket
+ */
+app.put('/api/chamados/:id', async (req, res) => {
+    const { id } = req.params;
+    const {
+        CODCLIENTE, NUMERO_SERIE, SLAID,
+        DESCRICAO, URGENCIA, ID_STATUS,
+        ID_CONTATO, ID_ATIVO, ID_TECNICO
+    } = req.body;
+
+    try {
+        const query = `
+            UPDATE CHAMADOS 
+            SET CODCLIENTE = ?, NUMERO_SERIE = ?, SLAID = ?,
+                DESCRICAO = ?, URGENCIA = ?, ID_STATUS = ?,
+                ID_CONTATO = ?, ID_ATIVO = ?, ID_TECNICO = ?
+            WHERE ID_CHAMADO = ?
+        `;
+        await db.query(query, [
+            CODCLIENTE || null,
+            NUMERO_SERIE || null,
+            SLAID || null,
+            DESCRICAO || null,
+            URGENCIA || null,
+            ID_STATUS || null,
+            ID_CONTATO || null,
+            ID_ATIVO || null,
+            ID_TECNICO || null,
+            id
+        ]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/api/chamados/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await db.query('DELETE FROM CHAMADOS WHERE ID_CHAMADO = ?', [id]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error in DELETE /api/chamados:', error);
         res.status(500).json({ error: error.message });
     }
 });

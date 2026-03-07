@@ -25,6 +25,8 @@
                             Dashboard</a></li>
                     <li><a href="#" class="nav-item" data-target="clients"><span class="icon">👥</span> Clientes</a>
                     </li>
+                    <li><a href="#" class="nav-item" data-target="chamados"><span class="icon">🎫</span> Chamados</a>
+                    </li>
                     <li><a href="#" class="nav-item" data-target="contracts"><span class="icon">📄</span> Contratos</a>
                     </li>
                     <li><a href="#" class="nav-item" data-target="assets"><span class="icon">📦</span> Ativos</a></li>
@@ -83,6 +85,35 @@
         </main>
     </div>
 
+    <!-- Chamados View -->
+    <div id="chamados-view" class="view-section" style="display: none;">
+        <div class="header-actions">
+            <h2>Chamados Técnicos</h2>
+            <button class="btn-primary" onclick="appManager.openChamadoModal()">+ Novo Chamado</button>
+        </div>
+        <div class="card">
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Ticket ID</th>
+                            <th>Cliente</th>
+                            <th>Nº Série Eq.</th>
+                            <th>Data e Hora</th>
+                            <th>SLA</th>
+                            <th>Status</th>
+                            <th>Urgência</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="chamadosTableBody">
+                        <!-- Loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- Reports View -->
     <div id="reports-view" class="view-section" style="display: none;">
         <div class="header-actions">
@@ -91,6 +122,89 @@
         <!-- ... content ... -->
     </div>
 
+
+    <!-- Chamado Modal -->
+    <div id="chamadoModal" class="modal-overlay">
+        <div class="modal-window" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 id="chamadoModalTitle">Novo Chamado</h3>
+                <button class="modal-close" onclick="appManager.closeModal('chamadoModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="chamadoForm">
+                    <input type="hidden" id="chamadoId">
+                    <div class="form-group">
+                        <label>Cliente</label>
+                        <select id="chamadoClient" class="form-control" required>
+                            <option value="">Selecione um Cliente...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 2">
+                                <label>Número de Série / Identificação</label>
+                                <input type="text" id="chamadoSerie" class="form-control"
+                                    placeholder="Serial do equipamento ou outro identificador">
+                            </div>
+                            <div class="form-group" style="flex: 1">
+                                <label>SLA (Tempo de Resposta)</label>
+                                <select id="chamadoSLA" class="form-control">
+                                    <option value="">Selecione...</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 1">
+                                <label>Contato Solicitante</label>
+                                <select id="chamadoContato" class="form-control">
+                                    <option value="">Selecione o Contato...</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1">
+                                <label>Ativo (Equipamento)</label>
+                                <select id="chamadoAtivo" class="form-control">
+                                    <option value="">Selecione o Ativo...</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Descrição do Problema / Sintoma</label>
+                            <textarea id="chamadoDescricao" class="form-control" rows="4" required
+                                placeholder="Descreva o motivo do chamado..."></textarea>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 1">
+                                <label>Urgência</label>
+                                <select id="chamadoUrgencia" class="form-control" required>
+                                    <option value="low">Baixa</option>
+                                    <option value="medium" selected>Média</option>
+                                    <option value="high">Alta</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1">
+                                <label>Status</label>
+                                <select id="chamadoStatus" class="form-control" required>
+                                    <option value="">Carregando Status...</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1">
+                                <label>Técnico (Opcional)</label>
+                                <select id="chamadoTecnico" class="form-control">
+                                    <option value="">Nenhum</option>
+                                </select>
+                            </div>
+                        </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="appManager.closeModal('chamadoModal')">Cancelar</button>
+                <button class="btn-primary" onclick="appManager.saveChamado()">Salvar Chamado</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Product Modal -->
     <div id="produtoModal" class="modal-overlay">
@@ -603,6 +717,14 @@
                         <div class="form-group" style="flex:1">
                             <label>Status</label>
                             <select id="contractStatus" class="form-control">
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>SLA</label>
+                            <select id="contractSLA" class="form-control">
                                 <option value="">Selecione...</option>
                             </select>
                         </div>

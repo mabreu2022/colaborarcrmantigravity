@@ -105,6 +105,10 @@ class AppManager {
                 contentArea.innerHTML = '<div class="loading">Carregando Usuários...</div>';
                 await this.loadUsers();
                 break;
+            case 'chamados':
+                contentArea.innerHTML = '<div class="loading">Carregando Chamados...</div>';
+                await this.loadChamados();
+                break;
             case 'agenda':
                 contentArea.innerHTML = '<div class="loading">Carregando Agenda...</div>';
                 await this.loadAgenda();
@@ -449,11 +453,198 @@ class AppManager {
         document.getElementById('content-area').innerHTML = table;
     }
 
+    // --- CHAMADOS CRUD ---
+    async loadChamados() {
+        try {
+            const response = await fetch('api/chamados');
+            if (!response.ok) throw new Error('Erro ao carregar chamados');
+            const data = await response.json();
+            this.renderChamados(data);
+        } catch (error) {
+            console.error(error);
+            this.showError('Erro ao carregar chamados', error.message);
+        }
+    }
+
+    async openChamadoModal(chamadoData = null) {
+        const modal = document.getElementById('chamadoModal');
+        const title = document.getElementById('chamadoModalTitle');
+        const form = document.getElementById('chamadoForm');
+
+        form.reset();
+        document.getElementById('chamadoId').value = '';
+
+        // Load Options
+        try {
+            const [clientsRes, slaRes, statusRes, ativoRes, contatoRes, tecnicoRes] = await Promise.all([
+                fetch('api/clientes'),
+                fetch('api/sla'),
+                fetch('api/status'),
+                fetch('api/ativos'),
+                fetch('api/contatos'),
+                fetch('api/tecnicos')
+            ]);
+            const clients = await clientsRes.json();
+            const slas = await slaRes.json();
+            const statuses = await statusRes.json();
+            const ativos = await ativoRes.json();
+            const contatos = contatoRes.ok ? await contatoRes.json() : [];
+            const tecnicos = tecnicoRes.ok ? await tecnicoRes.json() : [];
+
+            const clientSelect = document.getElementById('chamadoClient');
+            clientSelect.innerHTML = '<option value="">Selecione um Cliente...</option>' +
+                clients.map(c => `<option value="${c.ID_CLIENTE}">${c.NOME_RAZAO}</option>`).join('');
+
+            const slaSelect = document.getElementById('chamadoSLA');
+            slaSelect.innerHTML = '<option value="">Selecione o SLA...</option>' +
+                slas.map(s => `<option value="${s.ID_SLA}">${s.SLDESC}</option>`).join('');
+
+            const statusSelect = document.getElementById('chamadoStatus');
+            statusSelect.innerHTML = '<option value="">Selecione o Status...</option>' +
+                statuses.map(s => `<option value="${s.ID_STATUS}">${s.STATUS}</option>`).join('');
+
+            const ativoSelect = document.getElementById('chamadoAtivo');
+            ativoSelect.innerHTML = '<option value="">Nenhum Ativo Vinculado</option>' +
+                ativos.map(a => `<option value="${a.ID_ATIVO}">${a.DESCRICAO} (${a.NUMERO_SERIE || 'S/N'})</option>`).join('');
+
+            const contatoSelect = document.getElementById('chamadoContato');
+            contatoSelect.innerHTML = '<option value="">Nenhum Contato Vinculado</option>' +
+                contatos.map(c => `<option value="${c.ID_CONTATO}">${c.NOME_CONTATO}</option>`).join('');
+
+            const tecnicoSelect = document.getElementById('chamadoTecnico');
+            tecnicoSelect.innerHTML = '<option value="">Nenhum Técnico Vinculado</option>' +
+                tecnicos.map(t => `<option value="${t.ID_TECNICO}">${t.NOME}</option>`).join('');
+
+        } catch (e) {
+            console.error("Error loading options for Chamado Modal:", e);
+        }
+
+        if (chamadoData) {
+            const chamado = JSON.parse(decodeURIComponent(chamadoData));
+            title.textContent = 'Editar Chamado';
+            document.getElementById('chamadoId').value = chamado.ID_CHAMADO;
+            document.getElementById('chamadoClient').value = chamado.CODCLIENTE || '';
+            document.getElementById('chamadoSerie').value = chamado.NUMERO_SERIE || '';
+            document.getElementById('chamadoSLA').value = chamado.SLAID || '';
+            document.getElementById('chamadoDescricao').value = chamado.DESCRICAO || '';
+            document.getElementById('chamadoUrgencia').value = chamado.URGENCIA || 'medium';
+            document.getElementById('chamadoStatus').value = chamado.ID_STATUS || 1;
+            document.getElementById('chamadoAtivo').value = chamado.ID_ATIVO || '';
+            document.getElementById('chamadoContato').value = chamado.ID_CONTATO || '';
+            document.getElementById('chamadoTecnico').value = chamado.ID_TECNICO || '';
+        } else {
+            title.textContent = 'Novo Chamado';
+            document.getElementById('chamadoStatus').value = 1;
+            document.getElementById('chamadoUrgencia').value = 'medium';
+            document.getElementById('chamadoDescricao').value = '';
+        }
+        modal.classList.add('active');
+    }
+
+    async saveChamado() {
+        const id = document.getElementById('chamadoId').value;
+        const data = {
+            CODCLIENTE: document.getElementById('chamadoClient').value,
+            NUMERO_SERIE: document.getElementById('chamadoSerie').value,
+            SLAID: document.getElementById('chamadoSLA').value || null,
+            DESCRICAO: document.getElementById('chamadoDescricao').value,
+            URGENCIA: document.getElementById('chamadoUrgencia').value,
+            ID_STATUS: document.getElementById('chamadoStatus').value || 1,
+            ID_ATIVO: document.getElementById('chamadoAtivo').value || null,
+            ID_CONTATO: document.getElementById('chamadoContato').value || null,
+            ID_TECNICO: document.getElementById('chamadoTecnico').value || null
+        };
+
+        if (!data.CODCLIENTE || !data.DESCRICAO) {
+            alert('Preencha pelo menos o Cliente e a Descrição!');
+            return;
+        }
+
+        try {
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `api/chamados/${id}` : 'api/chamados';
+            const result = await (await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })).json();
+            if (!result.success) throw new Error(result.error || 'Erro ao salvar chamado');
+            this.closeModal('chamadoModal');
+            this.loadChamados();
+        } catch (e) { alert(e.message); }
+    }
+
+    async deleteChamado(id) {
+        if (!confirm('Excluir chamado?')) return;
+        await fetch(`api/chamados/${id}`, { method: 'DELETE' });
+        this.loadChamados();
+    }
+
+    renderChamados(data) {
+        const contentArea = document.getElementById('content-area');
+
+        // Re-use the layout defined in index.html (or re-generate)
+        // Since loadPage overrides content-area, we must recreate the HTML
+        let tableHtml = `
+            <div class="header-actions" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+                <h2>Chamados Técnicos</h2>
+                <button class="btn-primary" onclick="appManager.openChamadoModal()">+ Novo Chamado</button>
+            </div>
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Ticket ID</th>
+                                <th>Cliente</th>
+                                <th>Nº Série Eq.</th>
+                                <th>Data e Hora</th>
+                                <th>SLA</th>
+                                <th>Status</th>
+                                <th>Urgência</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+        if (data.length === 0) {
+            tableHtml += '<tr><td colspan="8" style="text-align:center; padding: 1rem;">Nenhum chamado encontrado.</td></tr>';
+        } else {
+            data.forEach(item => {
+                const dataStr = encodeURIComponent(JSON.stringify(item));
+                const dataHora = item.DATA_HORA ? new Date(item.DATA_HORA).toLocaleString('pt-BR') : '-';
+
+                // Translate Urgency
+                let urgLabel = 'Média';
+                if (item.URGENCIA === 'low') urgLabel = 'Baixa';
+                if (item.URGENCIA === 'high') urgLabel = 'Alta';
+
+                tableHtml += `<tr>
+                    <td><strong>${item.TICKETID || '-'}</strong></td>
+                    <td>${item.CLIENTE_NOME || '-'}</td>
+                    <td>${item.NUMERO_SERIE || '-'}</td>
+                    <td>${dataHora}</td>
+                    <td><span class="badge">${item.SLA_DESC || '-'}</span></td>
+                    <td><span class="badge">${item.STATUS_NOME || 'Aberto'}</span></td>
+                    <td><span class="badge">${urgLabel}</span></td>
+                    <td>
+                        <button class="btn-icon" onclick="appManager.openChamadoModal('${dataStr}')">✏️</button>
+                        <button class="btn-icon" onclick="appManager.deleteChamado(${item.ID_CHAMADO})">🗑️</button>
+                    </td>
+                </tr>`;
+            });
+        }
+
+        tableHtml += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
+
+        contentArea.innerHTML = tableHtml;
+    }
+
     // Helper methods to reduce duplication
     renderTable(title, headers, rows) {
         const contentArea = document.getElementById('content-area');
         contentArea.innerHTML = `
-            <div class="card">
+            < div class="card" >
                 <div class="card-header">
                     <h2>${title}</h2>
                     <button class="btn-primary">Novo ${title.slice(0, -1)}</button>
@@ -466,24 +657,24 @@ class AppManager {
                         <tbody>${rows}</tbody>
                     </table>
                 </div>
-            </div>
-        `;
+            </div >
+            `;
     }
 
     showError(title, message) {
         document.getElementById('content-area').innerHTML = `
-            <div class="error-message">
+            < div class="error-message" >
                 <h3>${title}</h3>
                 <p>${message}</p>
-            </div>`;
+            </div > `;
     }
 
     showEmpty(message, title) {
         document.getElementById('content-area').innerHTML = `
-            <div class="card">
+            < div class="card" >
                 <div class="card-header"><h2>${title}</h2></div>
                 <p>${message}</p>
-            </div>`;
+            </div > `;
     }
 
     async loadContracts() {
@@ -507,10 +698,10 @@ class AppManager {
         } catch (error) {
             console.error(error);
             document.getElementById('content-area').innerHTML = `
-                <div class="error-message">
+            < div class="error-message" >
                     <h3>Erro ao carregar contratos</h3>
                     <p>${error.message}</p>
-                </div>`;
+                </div > `;
         }
     }
 
@@ -559,7 +750,7 @@ class AppManager {
                     const contractData = encodeURIComponent(JSON.stringify(item));
 
                     rows += `
-                        <tr>
+            < tr >
                             <td>${item.ID_CONTRATO}</td>
                             <td>${item.NOME_RAZAO || 'N/A'}</td>
                             <td>${item.DESCRICAO || '-'}</td>
@@ -567,12 +758,13 @@ class AppManager {
                             <td>${dataFim}</td>
                             <td>${valor}</td>
                             <td><span class="badge">${item.STATUS_NOME || item.STATUS || '-'}</span></td>
+                            <td><span class="badge">${item.SLA_NOME || '-'}</span></td>
                             <td>
                                 <button class="btn-icon" onclick="appManager.openContractModal('${contractData}')">✏️</button>
                                 <button class="btn-icon" onclick="appManager.deleteContract(${item.ID_CONTRATO})">🗑️</button>
                             </td>
-                        </tr>
-                    `;
+                        </tr >
+            `;
                 });
                 existingTbody.innerHTML = rows;
             }
@@ -592,17 +784,17 @@ class AppManager {
         let clientOptions = '<option value="">Todos os Clientes</option>';
         if (this.clientsData) {
             this.clientsData.forEach(c => {
-                clientOptions += `<option value="${c.ID_CLIENTE}" ${this.contractFilterClient == c.ID_CLIENTE ? 'selected' : ''}>${c.NOME_RAZAO}</option>`;
+                clientOptions += `< option value = "${c.ID_CLIENTE}" ${this.contractFilterClient == c.ID_CLIENTE ? 'selected' : ''}> ${c.NOME_RAZAO}</option > `;
             });
         }
 
         // Header with Filters
         const header = `
-            <div class="card">
+            < div class="card" >
                 <div class="card-header" style="flex-wrap: wrap; gap: 10px;">
                     <h2>Contratos</h2>
                     <div class="header-actions" style="flex-wrap: wrap; align-items: center; gap: 5px;">
-                        
+
                         <!-- Client Filter -->
                         <select class="form-control" style="width: 180px;" onchange="appManager.contractFilterClient = this.value; appManager.filterContracts()">
                             ${clientOptions}
@@ -610,41 +802,41 @@ class AppManager {
 
                         <!-- Period Filter -->
                         <div style="display: flex; gap: 5px; align-items: center;">
-                            <input type="date" class="form-control" style="width: 130px;" title="Data Início" 
-                                   value="${this.contractFilterStart}" onchange="appManager.contractFilterStart = this.value; appManager.filterContracts()">
-                            <span>a</span>
-                            <input type="date" class="form-control" style="width: 130px;" title="Data Fim" 
-                                   value="${this.contractFilterEnd}" onchange="appManager.contractFilterEnd = this.value; appManager.filterContracts()">
-                        </div>
+                            <input type="date" class="form-control" style="width: 130px;" title="Data Início"
+                                value="${this.contractFilterStart}" onchange="appManager.contractFilterStart = this.value; appManager.filterContracts()">
+                                <span>a</span>
+                                <input type="date" class="form-control" style="width: 130px;" title="Data Fim"
+                                    value="${this.contractFilterEnd}" onchange="appManager.contractFilterEnd = this.value; appManager.filterContracts()">
+                                </div>
 
-                        <!-- Status Filter -->
-                        <div class="btn-group">
-                            <button class="btn-sm ${this.contractFilterStatus === 'Todos' ? 'active' : ''}" onclick="appManager.contractFilterStatus='Todos'; appManager.filterContracts()">Todos</button>
-                            <button class="btn-sm ${this.contractFilterStatus === 'Ativo' ? 'active' : ''}" onclick="appManager.contractFilterStatus='Ativo'; appManager.filterContracts()">Ativo</button>
-                            <button class="btn-sm ${this.contractFilterStatus === 'Inativo' ? 'active' : ''}" onclick="appManager.contractFilterStatus='Inativo'; appManager.filterContracts()">Inativo</button>
-                        </div>
+                                <!-- Status Filter -->
+                                <div class="btn-group">
+                                    <button class="btn-sm ${this.contractFilterStatus === 'Todos' ? 'active' : ''}" onclick="appManager.contractFilterStatus='Todos'; appManager.filterContracts()">Todos</button>
+                                    <button class="btn-sm ${this.contractFilterStatus === 'Ativo' ? 'active' : ''}" onclick="appManager.contractFilterStatus='Ativo'; appManager.filterContracts()">Ativo</button>
+                                    <button class="btn-sm ${this.contractFilterStatus === 'Inativo' ? 'active' : ''}" onclick="appManager.contractFilterStatus='Inativo'; appManager.filterContracts()">Inativo</button>
+                                </div>
 
-                        <button class="btn-primary" onclick="appManager.openContractModal()">Novo Contrato</button>
-                    </div>
-                </div>`;
+                                <button class="btn-primary" onclick="appManager.openContractModal()">Novo Contrato</button>
+                        </div>
+                    </div>`;
 
         let tableHtml = header + `
-                <div class="table-responsive">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Cliente</th>
-                                <th>Descrição</th>
-                                <th>Data Início</th>
-                                <th>Data Fim</th>
-                                <th>Valor</th>
-                                <th>Status</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="contractsTableBody">
-        `;
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Cliente</th>
+                                    <th>Descrição</th>
+                                    <th>Data Início</th>
+                                    <th>Data Fim</th>
+                                    <th>Valor</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="contractsTableBody">
+                                `;
 
         if (data.length === 0) {
             tableHtml += '<tr><td colspan="8" style="text-align:center; padding: 1rem;">Nenhum contrato encontrado.</td></tr>';
@@ -1969,6 +2161,7 @@ class AppManager {
             document.getElementById('contractEnd').value = contract.DATA_FIM ? contract.DATA_FIM.split('T')[0] : '';
             document.getElementById('contractValue').value = contract.VALOR_MENSAL;
             document.getElementById('contractStatus').value = contract.ID_STATUS;
+            document.getElementById('contractSLA').value = contract.SLAID || '';
             document.getElementById('contractObs').value = contract.OBSERVACOES || '';
         } else {
             title.textContent = 'Novo Contrato';
@@ -1987,6 +2180,7 @@ class AppManager {
     async loadDropdowns() {
         const clientSelect = document.getElementById('contractClient');
         const statusSelect = document.getElementById('contractStatus');
+        const slaSelect = document.getElementById('contractSLA');
         const assetOwner = document.getElementById('assetOwner');
         const assetStatusDb = document.getElementById('assetStatusDb');
         const userProfile = document.getElementById('userProfile');
@@ -2076,6 +2270,7 @@ class AppManager {
             DATA_FIM: document.getElementById('contractEnd').value || null,
             VALOR_MENSAL: document.getElementById('contractValue').value || 0,
             ID_STATUS: document.getElementById('contractStatus').value,
+            SLAID: document.getElementById('contractSLA').value || null,
             DESCRICAO: document.getElementById('contractDesc').value,
             OBSERVACOES: document.getElementById('contractObs').value
         };
