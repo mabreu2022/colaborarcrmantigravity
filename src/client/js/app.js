@@ -593,6 +593,7 @@ class AppManager {
                             <tr>
                                 <th>Ticket ID</th>
                                 <th>Cliente</th>
+                                <th>Ativo</th>
                                 <th>Nº Série Eq.</th>
                                 <th>Data e Hora</th>
                                 <th>SLA</th>
@@ -604,7 +605,7 @@ class AppManager {
                         <tbody>`;
 
         if (data.length === 0) {
-            tableHtml += '<tr><td colspan="8" style="text-align:center; padding: 1rem;">Nenhum chamado encontrado.</td></tr>';
+            tableHtml += '<tr><td colspan="9" style="text-align:center; padding: 1rem;">Nenhum chamado encontrado.</td></tr>';
         } else {
             data.forEach(item => {
                 const dataStr = encodeURIComponent(JSON.stringify(item));
@@ -618,6 +619,7 @@ class AppManager {
                 tableHtml += `<tr>
                     <td><strong>${item.TICKETID || '-'}</strong></td>
                     <td>${item.CLIENTE_NOME || '-'}</td>
+                    <td>${item.ATIVO_NOME || '-'}</td>
                     <td>${item.NUMERO_SERIE || '-'}</td>
                     <td>${dataHora}</td>
                     <td><span class="badge">${item.SLA_DESC || '-'}</span></td>
