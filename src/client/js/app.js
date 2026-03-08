@@ -2498,6 +2498,25 @@ class AppManager {
             } catch (e) { console.error("Error loading asset status", e); }
         }
 
+        // 5. SLA List
+        if (slaSelect && slaSelect.options.length <= 1) {
+            try {
+                const response = await fetch('api/sla');
+                if (!response.ok) throw new Error('Falha ao buscar SLAs');
+                const slas = await response.json();
+
+                console.log('SLAs Carregados:', slas); // Debug
+
+                slaSelect.innerHTML = '<option value="">Selecione...</option>';
+                slas.forEach(sla => {
+                    const text = sla.SLDESC || sla.NOME || `SLA ${sla.ID_SLA}`;
+                    const value = sla.ID_SLA || sla.IDSLA || sla.ID;
+                    slaSelect.options.add(new Option(text, value));
+                });
+            } catch (e) {
+                console.error("Erro ao carregar SLAs:", e);
+            }
+        }
         // 5. User Profiles
         if (userProfile) { // Removed length check to force reload
             try {
