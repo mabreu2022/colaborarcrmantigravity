@@ -999,7 +999,7 @@ class AppManager {
                     const contractData = encodeURIComponent(JSON.stringify(item));
 
                     rows += `
-            < tr >
+            <tr>
                             <td>${item.ID_CONTRATO}</td>
                             <td>${item.NOME_RAZAO || 'N/A'}</td>
                             <td>${item.DESCRICAO || '-'}</td>
@@ -1012,7 +1012,7 @@ class AppManager {
                                 <button class="btn-icon" onclick="appManager.openContractModal('${contractData}')">✏️</button>
                                 <button class="btn-icon" onclick="appManager.deleteContract(${item.ID_CONTRATO})">🗑️</button>
                             </td>
-                        </tr >
+                        </tr>
             `;
                 });
                 existingTbody.innerHTML = rows;
@@ -1033,13 +1033,13 @@ class AppManager {
         let clientOptions = '<option value="">Todos os Clientes</option>';
         if (this.clientsData) {
             this.clientsData.forEach(c => {
-                clientOptions += `< option value = "${c.ID_CLIENTE}" ${this.contractFilterClient == c.ID_CLIENTE ? 'selected' : ''}> ${c.NOME_RAZAO}</option > `;
+                clientOptions += `<option value="${c.ID_CLIENTE}" ${this.contractFilterClient == c.ID_CLIENTE ? 'selected' : ''}>${c.NOME_RAZAO}</option>`;
             });
         }
 
         // Header with Filters
         const header = `
-            < div class="card" >
+            <div class="card">
                 <div class="card-header" style="flex-wrap: wrap; gap: 10px;">
                     <h2>Contratos</h2>
                     <div class="header-actions" style="flex-wrap: wrap; align-items: center; gap: 5px;">
