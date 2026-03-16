@@ -222,11 +222,12 @@ class AppManager {
             document.getElementById('assetSerial').value = asset.NUMERO_SERIE || '';
             document.getElementById('assetStatusDb').value = asset.ID_STATUS;
             document.getElementById('assetOwner').value = asset.ID_CLIENTE_PROPRIETARIO || '';
+            
+            // Filter contracts for this client
+            await this.updateAssetContracts(asset.ID_CONTRATO);
+
             if (document.getElementById('assetProduct')) {
                 document.getElementById('assetProduct').value = asset.ID_PRODUTO || '';
-            }
-            if (document.getElementById('assetContract')) {
-                document.getElementById('assetContract').value = asset.ID_CONTRATO || '';
             }
         } else {
             title.textContent = 'Novo Ativo';
@@ -388,6 +389,37 @@ class AppManager {
 
         table += '</tbody></table></div></div>';
         contentArea.innerHTML = table;
+    }
+
+    async updateAssetContracts(selectedContractId = null) {
+        const clientId = document.getElementById('assetOwner').value;
+        const assetContract = document.getElementById('assetContract');
+
+        if (!assetContract) return;
+
+        if (!clientId) {
+            assetContract.innerHTML = '<option value="">Selecione um proprietário primeiro...</option>';
+            return;
+        }
+
+        assetContract.innerHTML = '<option value="">Carregando contratos...</option>';
+
+        try {
+            const res = await fetch(`api/contratos/cliente/${clientId}`);
+            const contracts = await res.json();
+
+            assetContract.innerHTML = '<option value="">Selecione um contrato...</option>';
+            contracts.forEach(c => {
+                assetContract.options.add(new Option((c.DESCRICAO || `Contrato ${c.ID_CONTRATO}`), c.ID_CONTRATO));
+            });
+
+            if (selectedContractId) {
+                assetContract.value = selectedContractId;
+            }
+        } catch (e) {
+            console.error('Error loading client contracts', e);
+            assetContract.innerHTML = '<option value="">Erro ao carregar</option>';
+        }
     }
 
     async loadUsers() {
@@ -2554,12 +2586,7 @@ class AppManager {
         }
 
         if (assetContract) {
-            try {
-                const res = await fetch('api/contratos');
-                const contracts = await res.json();
-                assetContract.innerHTML = '<option value="">Selecione um contrato...</option>';
-                contracts.forEach(c => assetContract.options.add(new Option((c.DESCRICAO || `Contrato ${c.ID_CONTRATO}`), c.ID_CONTRATO)));
-            } catch (e) { console.error('Error loading contracts', e); }
+            assetContract.innerHTML = '<option value="">Selecione um proprietário primeiro...</option>';
         }
 
         const clients = await (await fetch('api/clientes')).json();
