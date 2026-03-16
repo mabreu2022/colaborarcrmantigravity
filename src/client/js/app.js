@@ -301,7 +301,7 @@ class AppManager {
             } else {
                 let rows = '';
                 data.forEach(item => {
-                    const itemData = encodeURIComponent(JSON.stringify(item));
+                    const itemData = encodeURIComponent(JSON.stringify(item)).replace(/'/g, "\\'");
                     rows += `<tr>
                         <td>${item.ID_ATIVO}</td>
                         <td>${item.DESCRICAO}</td>
@@ -367,7 +367,7 @@ class AppManager {
             table += '<tr><td colspan="6" style="text-align:center; padding: 1rem;">Nenhum ativo encontrado.</td></tr>';
         } else {
             data.forEach(item => {
-                const itemData = encodeURIComponent(JSON.stringify(item));
+                const itemData = encodeURIComponent(JSON.stringify(item)).replace(/'/g, "\\'");
                 table += `<tr>
                     <td>${item.ID_ATIVO}</td>
                     <td>${item.DESCRICAO}</td>
@@ -477,7 +477,7 @@ class AppManager {
                             </thead>
                             <tbody>
                                 ${data.map(item => {
-            const itemData = encodeURIComponent(JSON.stringify(item));
+            const itemData = encodeURIComponent(JSON.stringify(item)).replace(/'/g, "\\'");
             return `<tr>
                                         <td>${item.ID_USUARIO}</td>
                                         <td>${item.NOME}</td>
@@ -544,7 +544,7 @@ class AppManager {
             this.perfisData = data;
 
             tbody.innerHTML = data.map(p => {
-                const pData = encodeURIComponent(JSON.stringify(p));
+                const pData = encodeURIComponent(JSON.stringify(p)).replace(/'/g, "\\'");
                 // Count enabled permissions
                 const perms = Object.keys(p).filter(key => key.startsWith('CAN_') && p[key] === 1).length;
 
@@ -1085,7 +1085,7 @@ class AppManager {
                     const valor = item.VALOR_MENSAL ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.VALOR_MENSAL) : '-';
                     const dataInicio = item.DATA_INICIO ? new Date(item.DATA_INICIO).toLocaleDateString() : '-';
                     const dataFim = item.DATA_FIM ? new Date(item.DATA_FIM).toLocaleDateString() : '-';
-                    const contractData = encodeURIComponent(JSON.stringify(item));
+                    const contractData = encodeURIComponent(JSON.stringify(item)).replace(/'/g, "\\'");
 
                     rows += `
             <tr>
@@ -1183,7 +1183,7 @@ class AppManager {
                 const valor = item.VALOR_MENSAL ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.VALOR_MENSAL) : '-';
                 const dataInicio = item.DATA_INICIO ? new Date(item.DATA_INICIO).toLocaleDateString() : '-';
                 const dataFim = item.DATA_FIM ? new Date(item.DATA_FIM).toLocaleDateString() : '-';
-                const contractData = encodeURIComponent(JSON.stringify(item));
+                const contractData = encodeURIComponent(JSON.stringify(item)).replace(/'/g, "\\'");
 
                 tableHtml += `
                     <tr>
@@ -1450,7 +1450,7 @@ class AppManager {
             headers = ['Descrição', 'Série', 'Proprietário', 'Ações'];
             rows = data.assets.filter(a => (a.STATUS_NOME || a.STATUS || '').toLowerCase().includes('locado'))
                 .map(a => {
-                    const itemData = encodeURIComponent(JSON.stringify(a));
+                    const itemData = encodeURIComponent(JSON.stringify(a)).replace(/'/g, "\\'");
                     return `<tr>
                         <td>${a.DESCRICAO}</td>
                         <td>${a.NUMERO_SERIE || '-'}</td>
@@ -1466,7 +1466,7 @@ class AppManager {
             headers = ['Descrição', 'Série', 'Proprietário', 'Ações'];
             rows = data.assets.filter(a => (a.STATUS_NOME || a.STATUS || '').toLowerCase().includes('manutenção'))
                 .map(a => {
-                    const itemData = encodeURIComponent(JSON.stringify(a));
+                    const itemData = encodeURIComponent(JSON.stringify(a)).replace(/'/g, "\\'");
                     return `<tr>
                         <td>${a.DESCRICAO}</td>
                         <td>${a.NUMERO_SERIE || '-'}</td>
@@ -1484,7 +1484,7 @@ class AppManager {
                 const s = (a.STATUS_NOME || a.STATUS || '').toLowerCase();
                 return s.includes('estoque') || s.includes('disponivel') || s.includes('disponível');
             }).map(a => {
-                const itemData = encodeURIComponent(JSON.stringify(a));
+                const itemData = encodeURIComponent(JSON.stringify(a)).replace(/'/g, "\\'");
                 return `<tr>
                         <td>${a.DESCRICAO}</td>
                         <td>${a.NUMERO_SERIE || '-'}</td>
@@ -1630,7 +1630,7 @@ class AppManager {
                 let rows = '';
                 data.forEach(client => {
                     // Encode client object to pass safely
-                    const clientData = encodeURIComponent(JSON.stringify(client));
+                    const clientData = encodeURIComponent(JSON.stringify(client)).replace(/'/g, "\\'");
                     rows += `
                         <tr>
                             <td>${client.ID_CLIENTE}</td>
@@ -1684,7 +1684,7 @@ class AppManager {
         } else {
             data.forEach(client => {
                 // Encode client object to pass safely
-                const clientData = encodeURIComponent(JSON.stringify(client));
+                const clientData = encodeURIComponent(JSON.stringify(client)).replace(/'/g, "\\'");
                 tableHtml += `
                     <tr>
                         <td>${client.ID_CLIENTE}</td>
@@ -1865,7 +1865,7 @@ class AppManager {
             if (!list || list.length === 0) return '<tr><td colspan="7" style="text-align:center; padding: 1rem;">Nenhum agendamento encontrado.</td></tr>';
 
             return list.map(item => {
-                const itemData = encodeURIComponent(JSON.stringify(item));
+                const dataStr = encodeURIComponent(JSON.stringify(item)).replace(/'/g, "\\'");
                 const dr = item.DATA_RETIRADA ? new Date(item.DATA_RETIRADA).toLocaleDateString() : '-';
                 const dp = item.DATA_DEVOLUCAO_PREVISTA ? new Date(item.DATA_DEVOLUCAO_PREVISTA).toLocaleDateString() : '-';
 

@@ -592,18 +592,35 @@ app.post('/api/contratos', async (req, res) => {
  *         description: Contract updated successfully.
  */
 app.put('/api/contratos/:id', async (req, res) => {
-
     const { id } = req.params;
     const { ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, SLAID, DESCRICAO, OBSERVACOES } = req.body;
+    
+    console.log(`[DEBUG] PUT /api/contratos/${id} - Payload:`, req.body);
+    
     try {
         const query = `
             UPDATE CONTRATOS 
             SET ID_CLIENTE = ?, DATA_INICIO = ?, DATA_FIM = ?, VALOR_MENSAL = ?, ID_STATUS = ?, SLAID = ?, DESCRICAO = ?, OBSERVACOES = ?
             WHERE ID_CONTRATO = ?
         `;
-        await db.query(query, [ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, SLAID || null, DESCRICAO, OBSERVACOES, id]);
+        
+        const params = [
+            ID_CLIENTE || null, 
+            DATA_INICIO || null, 
+            DATA_FIM || null, 
+            VALOR_MENSAL || 0, 
+            ID_STATUS || null, 
+            SLAID || null, 
+            DESCRICAO || null, 
+            OBSERVACOES || null, 
+            id
+        ];
+        
+        await db.query(query, params);
+        console.log(`[DEBUG] PUT /api/contratos/${id} - Update successful`);
         res.json({ success: true });
     } catch (error) {
+        console.error(`[ERROR] PUT /api/contratos/${id} -`, error);
         res.status(500).json({ error: error.message });
     }
 });
