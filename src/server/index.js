@@ -785,7 +785,8 @@ app.delete('/api/status/:id', async (req, res) => {
 app.get('/api/ativos', async (req, res) => {
 
     try {
-        const query = `
+        const { cliente } = req.query;
+        let query = `
             SELECT 
                 A.ID_ATIVO,
                 A.DESCRICAO,
@@ -800,8 +801,14 @@ app.get('/api/ativos', async (req, res) => {
             LEFT JOIN CLIENTES C ON A.ID_CLIENTE_PROPRIETARIO = C.ID_CLIENTE
             LEFT JOIN "STATUS" S ON A.ID_STATUS = S.ID_STATUS
             LEFT JOIN ATIVOS_CONTRATOS AC ON A.ID_ATIVO = AC.ID_ATIVO
+            WHERE 1=1
         `;
-        const result = await db.query(query);
+        const params = [];
+        if (cliente) {
+            query += ' AND A.ID_CLIENTE_PROPRIETARIO = ?';
+            params.push(cliente);
+        }
+        const result = await db.query(query, params);
         res.json(result);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -922,10 +929,10 @@ async function syncAssetToInventory(idAtivo, statusId) {
         `;
         await db.query(movQuery, [asset.ID_PRODUTO, `RETORNO DE ATIVO: ${asset.DESCRICAO} (ID: ${idAtivo})`]);
 
-        // 3. Desvincular Cliente/Contrato no registro do ativo (caso existam esses campos)
-        // Nota: Baseado na análise, os vínculos principais ficam na AGENDA, 
-        // mas se houver ID_CLIENTE_PROPRIETARIO, ele deve ser mantido ou resetado para a Colaborar.
+        // 3. Desvincular Cliente/Contrato no registro do ativo
+        // Resetamos o proprietário para NULL (Próprio) e removemos o vínculo com qualquer contrato
         await db.query('UPDATE ATIVOS SET ID_CLIENTE_PROPRIETARIO = NULL WHERE ID_ATIVO = ?', [idAtivo]);
+        await db.query('DELETE FROM ATIVOS_CONTRATOS WHERE ID_ATIVO = ?', [idAtivo]);
 
     } catch (e) {
         console.error('Erro ao sincronizar ativo com estoque:', e);
@@ -1191,7 +1198,7 @@ app.get('/api/contratos/cliente/:id', async (req, res) => {
     try {
         // Select active contracts for this client
         const query = `
-            SELECT C.ID_CONTRATO, C.DESCRICAO, S.NOME as STATUS
+            SELECT C.ID_CONTRATO, C.DESCRICAO, S.NOME as STATUS, C.SLAID
             FROM CONTRATOS C
             LEFT JOIN STATUS_CONTRATO S ON C.ID_STATUS = S.ID_STATUS
             WHERE C.ID_CLIENTE = ?
@@ -1242,9 +1249,6 @@ app.get('/api/ativos/disponiveis', async (req, res) => {
         const params = [];
 
         if (contrato) {
-            // User requested: Assets belonging to this contract
-            // Assuming ATIVOS_CONTRATOS links valid assets for the contract
-            // We join to ensure the asset is in the contract list.
             query = `
                 SELECT A.ID_ATIVO, A.DESCRICAO, A.NUMERO_SERIE, S.STATUS
                 FROM ATIVOS A
@@ -1259,6 +1263,33 @@ app.get('/api/ativos/disponiveis', async (req, res) => {
         const result = await db.query(query, params);
         res.json(result);
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/contratos/:id/ativos/count', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await db.query('SELECT COUNT(*) as QTD FROM ATIVOS_CONTRATOS WHERE ID_CONTRATO = ?', [id]);
+        res.json({ count: result[0].QTD });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.get('/api/contratos/:id/ativos', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = `
+            SELECT A.ID_ATIVO, A.DESCRICAO, A.NUMERO_SERIE, S.STATUS as STATUS_NOME
+            FROM ATIVOS A
+            JOIN ATIVOS_CONTRATOS AC ON A.ID_ATIVO = AC.ID_ATIVO
+            LEFT JOIN "STATUS" S ON A.ID_STATUS = S.ID_STATUS
+            WHERE AC.ID_CONTRATO = ?
+        `;
+        const result = await db.query(query, [id]);
+        res.json(result);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // 4. Agendamentos CRUD

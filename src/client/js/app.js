@@ -223,14 +223,29 @@ class AppManager {
             document.getElementById('assetStatusDb').value = asset.ID_STATUS;
             document.getElementById('assetOwner').value = asset.ID_CLIENTE_PROPRIETARIO || '';
             
+            this.initialAssetStatus = asset.ID_STATUS;
+            this.initialAssetContract = asset.ID_CONTRATO;
+
             // Filter contracts for this client
             await this.updateAssetContracts(asset.ID_CONTRATO);
 
             if (document.getElementById('assetProduct')) {
                 document.getElementById('assetProduct').value = asset.ID_PRODUTO || '';
             }
+            
+            const btnHist = document.getElementById('btnVerHistoricoModal');
+            if (btnHist) {
+                btnHist.style.display = 'block';
+            }
         } else {
             title.textContent = 'Novo Ativo';
+            this.initialAssetStatus = null;
+            this.initialAssetContract = null;
+            
+            const btnHist = document.getElementById('btnVerHistoricoModal');
+            if (btnHist) {
+                btnHist.style.display = 'none';
+            }
         }
         modal.classList.add('active');
     }
@@ -251,14 +266,49 @@ class AppManager {
             return;
         }
 
+        // Logic for Contract Inactivity Prompt
+        let deactivateContract = false;
+        if (id && data.ID_STATUS == 2 && this.initialAssetStatus != 2 && this.initialAssetContract) {
+            try {
+                const res = await fetch(`api/contratos/${this.initialAssetContract}/ativos/count`);
+                const { count } = await res.json();
+                if (count == 1) {
+                    if (confirm('Este é o último ativo deste contrato. Deseja desativar o contrato?')) {
+                        deactivateContract = true;
+                    }
+                }
+            } catch (e) {
+                console.error('Erro ao verificar ativos do contrato:', e);
+            }
+        }
+
         try {
             const method = id ? 'PUT' : 'POST';
             const url = id ? `api/ativos/${id}` : 'api/ativos';
             const result = await (await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })).json();
             if (!result.success && !result.id) throw new Error(result.error || 'Erro');
+
+            if (deactivateContract) {
+                await fetch(`api/contratos/${this.initialAssetContract}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ID_STATUS: 2 }) // Status 2 = Inativo
+                });
+            }
+
             this.closeModal('assetModal');
             this.loadAssets();
         } catch (e) { alert(e.message); }
+    }
+
+    onAssetStatusChange() {
+        const status = document.getElementById('assetStatusDb').value;
+        if (status == 2) { // Estoque
+            document.getElementById('assetOwner').value = '';
+            document.getElementById('assetContract').value = '';
+            // Disparar o onchange para atualizar os contratos (limpar a lista)
+            this.updateAssetContracts();
+        }
     }
 
     async deleteAsset(id) {
@@ -311,11 +361,12 @@ class AppManager {
                         <td>${item.ID_ATIVO}</td>
                         <td>${item.DESCRICAO}</td>
                         <td>${item.NUMERO_SERIE || '-'}</td>
-                        <td><span class="badge">${item.STATUS_NOME || item.STATUS || '-'}</span></td>
+                        <td><span class="badge ${this.getStatusClass(item.STATUS_NOME || item.STATUS)}">${item.STATUS_NOME || item.STATUS || '-'}</span></td>
                         <td>${item.PROPRIETARIO || '-'}</td>
-                        <td>
-                            <button class="btn-icon" onclick="appManager.openAssetModal('${itemData}')">✏️</button>
-                            <button class="btn-icon" onclick="appManager.deleteAsset(${item.ID_ATIVO})">🗑️</button>
+                        <td style="white-space: nowrap;">
+                            <button class="btn-icon" onclick="appManager.openAssetModal('${itemData}')" title="Editar">✏️</button>
+                            ${item.NUMERO_SERIE && item.NUMERO_SERIE !== '-' ? `<button class="btn-icon" onclick="appManager.viewSerialHistory('${item.NUMERO_SERIE}')" title="Histórico">📜</button>` : ''}
+                            <button class="btn-icon" onclick="appManager.deleteAsset(${item.ID_ATIVO})" title="Excluir">🗑️</button>
                         </td>
                     </tr>`;
                 });
@@ -838,14 +889,22 @@ class AppManager {
             document.getElementById('chamadoTecnico').innerHTML = '<option value="">Nenhum</option>' + 
                 tecnicos.map(t => `<option value="${t.ID_TECNICO}">${t.NOME}</option>`).join('');
 
-            document.getElementById('chamadoAtivo').innerHTML = '<option value="">Nenhum</option>' + 
-                ativos.map(a => `<option value="${a.ID_ATIVO}">${a.DESCRICAO} (${a.NUMERO_SERIE})</option>`).join('');
+            document.getElementById('chamadoAtivo').innerHTML = '<option value="">Selecione o Cliente primeiro</option>';
+            document.getElementById('chamadoContato').innerHTML = '<option value="">Selecione o Cliente primeiro</option>';
+            document.getElementById('chamadoContrato').innerHTML = '<option value="">Selecione o Cliente primeiro</option>';
 
             if (chamadoData) {
                 const c = JSON.parse(decodeURIComponent(chamadoData));
                 title.textContent = 'Editar Chamado ' + c.TICKETID;
                 document.getElementById('chamadoId').value = c.ID_CHAMADO;
                 document.getElementById('chamadoClient').value = c.CODCLIENTE || '';
+                
+                // Store current values to select them AFTER dropdowns are populated
+                this.currentChamadoDataToSelect = {
+                    ID_CONTATO: c.ID_CONTATO,
+                    ID_ATIVO: c.ID_ATIVO
+                };
+                
                 await this.loadClientContracts(c.CODCLIENTE, c.ID_CONTRATO);
                 document.getElementById('chamadoSerie').value = c.NUMERO_SERIE || '';
                 document.getElementById('chamadoSLA').value = c.SLAID || '';
@@ -853,7 +912,6 @@ class AppManager {
                 document.getElementById('chamadoUrgencia').value = c.URGENCIA || 'Média';
                 document.getElementById('chamadoStatus').value = c.ID_STATUS_CHAMADO || '';
                 document.getElementById('chamadoTecnico').value = c.ID_TECNICO || '';
-                document.getElementById('chamadoAtivo').value = c.ID_ATIVO || '';
             } else {
                 title.textContent = 'Novo Chamado Técnico';
             }
@@ -863,13 +921,67 @@ class AppManager {
 
     async loadClientContracts(clientId, selectedId = null) {
         const select = document.getElementById('chamadoContrato');
-        if (!clientId) { select.innerHTML = '<option value="">Selecione o Cliente primeiro</option>'; return; }
+        const contactSelect = document.getElementById('chamadoContato');
+        const assetSelect = document.getElementById('chamadoAtivo');
+
+        if (!clientId) {
+            select.innerHTML = '<option value="">Selecione o Cliente primeiro</option>';
+            if (contactSelect) contactSelect.innerHTML = '<option value="">Selecione o Cliente primeiro</option>';
+            if (assetSelect) assetSelect.innerHTML = '<option value="">Selecione o Cliente primeiro</option>';
+            return;
+        }
+
         try {
-            const res = await fetch(`api/contratos/cliente/${clientId}`);
-            const data = await res.json();
+            // Load Contracts, Contacts and Assets in parallel
+            const [contractsRes, contactsRes, assetsRes] = await Promise.all([
+                fetch(`api/contratos/cliente/${clientId}`),
+                fetch(`api/clientes/${clientId}/contatos`),
+                fetch(`api/ativos?cliente=${clientId}`)
+            ]);
+
+            const [contracts, contacts, assets] = await Promise.all([
+                contractsRes.json(),
+                contactsRes.json(),
+                assetsRes.json()
+            ]);
+
+            this.currentClientContracts = contracts;
+
+            // Populate Contracts
             select.innerHTML = '<option value="">Nenhum Contrato Vinculado</option>' + 
-                data.map(c => `<option value="${c.ID_CONTRATO}" ${c.ID_CONTRATO == selectedId ? 'selected' : ''}>${c.DESCRICAO}</option>`).join('');
-        } catch (e) { select.innerHTML = '<option value="">Erro ao carregar contratos</option>'; }
+                contracts.map(c => `<option value="${c.ID_CONTRATO}" ${c.ID_CONTRATO == selectedId ? 'selected' : ''}>${c.DESCRICAO}</option>`).join('');
+
+            // Populate Contacts
+            if (contactSelect) {
+                contactSelect.innerHTML = '<option value="">Selecione...</option>' + 
+                    contacts.map(c => `<option value="${c.ID_CONTATO}">${c.NOME_CONTATO}</option>`).join('');
+            }
+
+            // Populate Assets
+            if (assetSelect) {
+                assetSelect.innerHTML = '<option value="">Nenhum</option>' + 
+                    assets.map(a => `<option value="${a.ID_ATIVO}">${a.DESCRICAO} (${a.NUMERO_SERIE})</option>`).join('');
+            }
+
+            // If we are editing, we might need to select the contact and asset
+            if (this.currentChamadoDataToSelect) {
+                if (contactSelect) contactSelect.value = this.currentChamadoDataToSelect.ID_CONTATO || '';
+                if (assetSelect) assetSelect.value = this.currentChamadoDataToSelect.ID_ATIVO || '';
+                delete this.currentChamadoDataToSelect;
+            }
+
+        } catch (e) {
+            console.error('Error loading client details:', e);
+            select.innerHTML = '<option value="">Erro ao carregar detalhes</option>';
+        }
+    }
+
+    onChamadoContratoChange(contractId) {
+        if (!contractId || !this.currentClientContracts) return;
+        const contract = this.currentClientContracts.find(c => c.ID_CONTRATO == contractId);
+        if (contract && contract.SLAID) {
+            document.getElementById('chamadoSLA').value = contract.SLAID;
+        }
     }
 
     async saveChamado() {
@@ -879,6 +991,7 @@ class AppManager {
             NUMERO_SERIE: document.getElementById('chamadoSerie').value,
             ID_CONTRATO: document.getElementById('chamadoContrato').value || null,
             SLAID: document.getElementById('chamadoSLA').value || null,
+            ID_CONTATO: document.getElementById('chamadoContato').value || null,
             DESCRICAO: document.getElementById('chamadoDescricao').value,
             URGENCIA: document.getElementById('chamadoUrgencia').value,
             ID_STATUS_CHAMADO: document.getElementById('chamadoStatus').value,
@@ -2528,6 +2641,9 @@ class AppManager {
         form.reset();
         document.getElementById('contractId').value = '';
 
+        // Reset Tabs to General
+        this.switchContractTab('general', false); // false = don't try to load products yet
+
         // Load Dropdowns
         await this.loadDropdowns();
 
@@ -2565,6 +2681,84 @@ class AppManager {
         }
 
         modal.classList.add('active');
+
+        if (contractData) {
+            this.currentContractId = JSON.parse(decodeURIComponent(contractData)).ID_CONTRATO;
+        } else {
+            this.currentContractId = null;
+        }
+    }
+
+    switchContractTab(tab, loadData = true) {
+        // Update Buttons
+        document.querySelectorAll('#contractModal .tab-btn').forEach(btn => btn.classList.remove('active'));
+        const activeBtn = document.getElementById(`btn-tab-contract-${tab}`);
+        if (activeBtn) activeBtn.classList.add('active');
+
+        // Update Panes
+        document.querySelectorAll('#contractModal .tab-pane').forEach(pane => pane.classList.remove('active'));
+        const activePane = document.getElementById(`tab-contract-${tab}`);
+        if (activePane) activePane.classList.add('active');
+
+        if (tab === 'products' && loadData && this.currentContractId) {
+            this.loadContractProducts(this.currentContractId);
+        }
+    }
+
+    async loadContractProducts(contractId) {
+        const container = document.getElementById('contractProductsList');
+        if (!container) return;
+
+        container.innerHTML = '<p>Carregando produtos...</p>';
+
+        try {
+            const res = await fetch(`api/contratos/${contractId}/ativos`);
+            const products = await res.json();
+
+            if (products.length === 0) {
+                container.innerHTML = '<p>Nenhum produto vinculado a este contrato.</p>';
+                return;
+            }
+
+            let html = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Descrição</th>
+                            <th>Nº Série</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            products.forEach(p => {
+                html += `
+                    <tr>
+                        <td>${p.ID_ATIVO}</td>
+                        <td>${p.DESCRICAO}</td>
+                        <td>${p.NUMERO_SERIE || '-'}</td>
+                        <td><span class="status-badge ${this.getStatusClass(p.STATUS_NOME)}">${p.STATUS_NOME}</span></td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+
+        } catch (e) {
+            container.innerHTML = `<p style="color:red">Erro ao carregar produtos: ${e.message}</p>`;
+        }
+    }
+
+    getStatusClass(status) {
+        if (!status) return '';
+        const s = status.toLowerCase();
+        if (s.includes('estoque') || s.includes('disponivel')) return 'status-estoque';
+        if (s.includes('locado') || s.includes('alugado')) return 'status-locado';
+        if (s.includes('manutenção') || s.includes('manutencao')) return 'status-manutencao';
+        return '';
     }
 
     async loadDropdowns() {
