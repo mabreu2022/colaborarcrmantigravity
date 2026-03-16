@@ -1,15 +1,16 @@
 const Firebird = require('node-firebird');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const options = {
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
+    host: process.env.DB_HOST || '127.0.0.1',
+    port: parseInt(process.env.DB_PORT) || 3050,
     database: process.env.DB_DATABASE,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    lowercase_keys: false, // set to true to lowercase keys
-    role: null,            // default
-    pageSize: 4096        // default when creating database
+    user: process.env.DB_USER || 'SYSDBA',
+    password: process.env.DB_PASSWORD || 'masterkey',
+    lowercase_keys: false,
+    role: null,
+    pageSize: 4096
 };
 
 const pool = Firebird.pool(5, options);

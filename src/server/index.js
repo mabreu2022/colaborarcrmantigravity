@@ -661,6 +661,13 @@ app.get('/api/status', async (req, res) => {
     }
 });
 
+app.get('/api/sla', async (req, res) => {
+    try {
+        const result = await db.query('SELECT * FROM SLA ORDER BY SLDESC');
+        res.json(result);
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
 /**
  * @openapi
  * /api/status:
@@ -2264,14 +2271,12 @@ app.delete('/api/contatos-fornecedor/:id', async (req, res) => {
 });
 
 
-// --- SLA API ---
-app.get('/api/sla', async (req, res) => {
+// --- STATUS CHAMADO API ---
+app.get('/api/status-chamado', async (req, res) => {
     try {
-        const result = await db.query('SELECT * FROM SLA ORDER BY SLDESC');
+        const result = await db.query('SELECT * FROM STATUS_CHAMADO ORDER BY ID_STATUS_CHAMADO');
         res.json(result);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+    } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 // --- CHAMADOS API ---
@@ -2284,43 +2289,68 @@ app.get('/api/sla', async (req, res) => {
  */
 app.get('/api/chamados/dashboard', async (req, res) => {
     try {
-        const now = new Date();
-        const month = now.getMonth() + 1;
-        const year = now.getFullYear();
-
         const queries = {
-            totalChamados: 'SELECT COUNT(*) as QTD FROM CHAMADOS',
-            contratosAtivos: 'SELECT COUNT(*) as QTD FROM CONTRATOS WHERE ID_STATUS = 1',
-            totalContratos: 'SELECT COUNT(*) as QTD FROM CONTRATOS',
-            ativosStatus: 'SELECT S.STATUS, COUNT(A.ID_ATIVO) as QTD FROM ATIVOS A LEFT JOIN "STATUS" S ON A.ID_STATUS = S.ID_STATUS GROUP BY S.STATUS',
-            contratosSLA: 'SELECT S.SLDESC, COUNT(C.ID_CONTRATO) as QTD FROM CONTRATOS C LEFT JOIN SLA S ON C.SLAID = S.ID_SLA GROUP BY S.SLDESC',
+            totalAbertos: `SELECT COUNT(*) as QTD FROM CHAMADOS C JOIN STATUS_CHAMADO S ON C.ID_STATUS_CHAMADO = S.ID_STATUS_CHAMADO WHERE TRIM(S.ENCERRA) = 'N'`,
+            totalEncerrados: `SELECT COUNT(*) as QTD FROM CHAMADOS C JOIN STATUS_CHAMADO S ON C.ID_STATUS_CHAMADO = S.ID_STATUS_CHAMADO WHERE TRIM(S.ENCERRA) = 'S'`,
+            porUrgencia: `SELECT URGENCIA, COUNT(*) as QTD FROM CHAMADOS GROUP BY URGENCIA`,
+            atrasadosSLA: `SELECT COUNT(*) as QTD FROM CHAMADOS WHERE DATA_PRAZO_SLA < CURRENT_TIMESTAMP AND ID_STATUS_CHAMADO NOT IN (SELECT ID_STATUS_CHAMADO FROM STATUS_CHAMADO WHERE TRIM(ENCERRA) = 'S')`,
             vencimentoMes: `
-                SELECT C.ID_CONTRATO, C.DESCRICAO, CL.NOME_RAZAO as CLIENTE_NOME, C.DATA_FIM 
-                FROM CONTRATOS C 
-                LEFT JOIN CLIENTES CL ON C.ID_CLIENTE = CL.ID_CLIENTE 
-                WHERE EXTRACT(MONTH FROM C.DATA_FIM) = ? AND EXTRACT(YEAR FROM C.DATA_FIM) = ?
+                SELECT FIRST 10 C.ID_CONTRATO, CL.NOME_RAZAO as CLIENTE_NOME, C.DESCRICAO, C.DATA_FIM
+                FROM CONTRATOS C
+                JOIN CLIENTES CL ON C.ID_CLIENTE = CL.ID_CLIENTE
+                WHERE C.DATA_FIM >= CURRENT_DATE 
+                AND C.DATA_FIM <= CAST(DATEADD(30 DAY TO CURRENT_DATE) AS DATE)
+                ORDER BY C.DATA_FIM ASC
+            `,
+            porSLA: `
+                SELECT SLA.SLDESC as SLA_NOME, COUNT(*) as QTD
+                FROM CONTRATOS C
+                JOIN SLA ON C.SLAID = SLA.ID_SLA
+                GROUP BY SLA.SLDESC
             `
         };
 
-        const results = await Promise.all([
-            db.query(queries.totalChamados),
-            db.query(queries.contratosAtivos),
-            db.query(queries.totalContratos),
-            db.query(queries.ativosStatus),
-            db.query(queries.contratosSLA),
-            db.query(queries.vencimentoMes, [month, year])
+        const [abertosRes, encerradosRes, urgenciaRes, atrasadosRes, vencimentoRes, slaRes] = await Promise.all([
+            db.query(queries.totalAbertos),
+            db.query(queries.totalEncerrados),
+            db.query(queries.porUrgencia),
+            db.query(queries.atrasadosSLA),
+            db.query(queries.vencimentoMes),
+            db.query(queries.porSLA)
         ]);
 
+        const processBlob = (blob) => {
+            return new Promise((resolve, reject) => {
+                if (!blob) return resolve('');
+                if (Buffer.isBuffer(blob)) return resolve(blob.toString());
+                if (typeof blob === 'function') {
+                    blob((err, name, eventEmitter) => {
+                        if (err) return reject(err);
+                        let data = '';
+                        eventEmitter.on('data', chunk => data += chunk.toString());
+                        eventEmitter.on('end', () => resolve(data));
+                        eventEmitter.on('error', reject);
+                    });
+                } else { resolve(blob.toString()); }
+            });
+        };
+
+        const parsedVencimento = await Promise.all(vencimentoRes.map(async row => ({
+            ...row,
+            DESCRICAO: await processBlob(row.DESCRICAO)
+        })));
+
         res.json({
-            totalChamados: results[0][0].QTD,
-            contratosAtivos: results[1][0].QTD,
-            totalContratos: results[2][0].QTD,
-            ativosStatus: results[3],
-            contratosSLA: results[4],
-            vencimentoMes: results[5]
+            abertos: abertosRes[0].QTD,
+            encerrados: encerradosRes[0].QTD,
+            porUrgencia: urgenciaRes,
+            atrasados: atrasadosRes[0].QTD,
+            vencimentoMes: parsedVencimento,
+            porSLA: slaRes
         });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+    } catch (error) { 
+        console.error('Dashboard API Error:', error);
+        res.status(500).json({ error: error.message }); 
     }
 });
 
@@ -2328,37 +2358,28 @@ app.get('/api/chamados/dashboard', async (req, res) => {
  * @openapi
  * /api/chamados:
  *   get:
- *     summary: Get all tickets 
+ *     summary: List all tickets
  */
 app.get('/api/chamados', async (req, res) => {
     try {
         const query = `
             SELECT 
-                C.ID_CHAMADO,
-                C.TICKETID,
-                C.CODCLIENTE,
+                C.*,
                 CL.NOME_RAZAO as CLIENTE_NOME,
-                C.NUMERO_SERIE,
-                C.DATA_HORA,
-                C.SLAID,
                 SLA.SLDESC as SLA_DESC,
-                C.ID_STATUS,
-                S.STATUS as STATUS_NOME,
-                C.URGENCIA,
-                C.ID_CONTATO,
+                S.NOME as STATUS_NOME, S.COR as STATUS_COR, S.ENCERRA as STATUS_ENCERRA,
                 CO.NOME_CONTATO as CONTATO_NOME,
-                C.ID_ATIVO,
                 ATV.DESCRICAO as ATIVO_NOME,
-                C.ID_TECNICO,
                 T.NOME as TECNICO_NOME,
-                C.DESCRICAO
+                CON.DESCRICAO as CONTRATO_DESC
             FROM CHAMADOS C
             LEFT JOIN CLIENTES CL ON C.CODCLIENTE = CL.ID_CLIENTE
             LEFT JOIN SLA ON C.SLAID = SLA.ID_SLA
-            LEFT JOIN STATUS S ON C.ID_STATUS = S.ID_STATUS
+            LEFT JOIN STATUS_CHAMADO S ON C.ID_STATUS_CHAMADO = S.ID_STATUS_CHAMADO
             LEFT JOIN CONTATOS CO ON C.ID_CONTATO = CO.ID_CONTATO
             LEFT JOIN ATIVOS ATV ON C.ID_ATIVO = ATV.ID_ATIVO
             LEFT JOIN TECNICOS T ON C.ID_TECNICO = T.ID_TECNICO
+            LEFT JOIN CONTRATOS CON ON C.ID_CONTRATO = CON.ID_CONTRATO
             ORDER BY C.DATA_HORA DESC
         `;
         const result = await db.query(query);
@@ -2375,123 +2396,187 @@ app.get('/api/chamados', async (req, res) => {
                         eventEmitter.on('end', () => resolve(data));
                         eventEmitter.on('error', reject);
                     });
-                } else {
-                    resolve(blob.toString());
-                }
+                } else { resolve(blob.toString()); }
             });
         };
 
         const parsedResult = await Promise.all(result.map(async row => ({
             ...row,
-            DESCRICAO: await processBlob(row.DESCRICAO)
+            DESCRICAO: await processBlob(row.DESCRICAO),
+            RESOLUCAO: await processBlob(row.RESOLUCAO),
+            CONTRATO_DESC: await processBlob(row.CONTRATO_DESC)
         })));
 
         res.json(parsedResult);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+    } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 /**
  * @openapi
  * /api/chamados:
  *   post:
- *     summary: Create a ticket
+ *     summary: Create a new ticket
  */
 app.post('/api/chamados', async (req, res) => {
-    // Note: Ticket ID will be generated
     const {
-        CODCLIENTE, NUMERO_SERIE, SLAID,
-        DESCRICAO, URGENCIA, ID_STATUS,
-        ID_CONTATO, ID_ATIVO, ID_TECNICO
+        CODCLIENTE, NUMERO_SERIE, SLAID, DESCRICAO, URGENCIA,
+        ID_STATUS_CHAMADO, ID_CONTATO, ID_ATIVO, ID_TECNICO, ID_CONTRATO
     } = req.body;
 
-    // Default Status = 1 if none provided
-    const statusVal = ID_STATUS || 1;
-
     try {
-        const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-        let uniqueID = '$';
-        for (let i = 0; i < 8; i++) {
-            uniqueID += chars.charAt(Math.floor(Math.random() * chars.length));
+        // 1. Geração Automática do TICKETID (TK-AAAA-NNNNN)
+        const year = new Date().getFullYear();
+        const genRes = await db.query('SELECT GEN_ID(GEN_TICKET_ID, 1) as NID FROM RDB$DATABASE');
+        const num = genRes[0].NID.toString().padStart(5, '0');
+        const ticketId = `TK-${year}-${num}`;
+
+        // 2. Cálculo de Data Prazo SLA (exemplo: soma horas do SLA se existir)
+        let dataPrazoSla = null;
+        if (SLAID) {
+            const sla = await db.query('SELECT SLDESC FROM SLA WHERE ID_SLA = ?', [SLAID]);
+            if (sla.length > 0) {
+                const hoursMatch = sla[0].SLDESC.match(/\d+/);
+                if (hoursMatch) {
+                    const hours = parseInt(hoursMatch[0]);
+                    const now = new Date();
+                    now.setHours(now.getHours() + hours);
+                    dataPrazoSla = now;
+                }
+            }
         }
 
         const query = `
             INSERT INTO CHAMADOS (
                 TICKETID, CODCLIENTE, NUMERO_SERIE, SLAID, DATA_HORA,
-                DESCRICAO, URGENCIA, ID_STATUS, ID_CONTATO, ID_ATIVO, ID_TECNICO
+                DESCRICAO, URGENCIA, ID_STATUS_CHAMADO, ID_CONTATO, ID_ATIVO, 
+                ID_TECNICO, ID_CONTRATO, DATA_PRAZO_SLA, DATA_MODIFICACAO
             )
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             RETURNING ID_CHAMADO
         `;
+
         const result = await db.query(query, [
-            uniqueID,
-            CODCLIENTE || null,
-            NUMERO_SERIE || null,
-            SLAID || null,
-            DESCRICAO || null,
-            URGENCIA || 'medium',
-            statusVal,
-            ID_CONTATO || null,
-            ID_ATIVO || null,
-            ID_TECNICO || null
+            ticketId, CODCLIENTE || null, NUMERO_SERIE || null, SLAID || null,
+            DESCRICAO || null, URGENCIA || 'Média', ID_STATUS_CHAMADO || 1,
+            ID_CONTATO || null, ID_ATIVO || null, ID_TECNICO || null,
+            ID_CONTRATO || null, dataPrazoSla
         ]);
 
-        res.json({ success: true, id: result.ID_CHAMADO, ticketId: uniqueID });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+        // 3. Registrar Histórico Inicial
+        await db.query(
+            `INSERT INTO HISTORICO_CHAMADOS (ID_CHAMADO, TIPO, DESCRICAO) VALUES (?, ?, ?)`,
+            [result.ID_CHAMADO, 'ABERTURA', 'Chamado aberto via sistema.']
+        );
+
+        res.json({ success: true, id: result.ID_CHAMADO, ticketId });
+    } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-/**
- * @openapi
- * /api/chamados/{id}:
- *   put:
- *     summary: Update a ticket
- */
 app.put('/api/chamados/:id', async (req, res) => {
     const { id } = req.params;
     const {
-        CODCLIENTE, NUMERO_SERIE, SLAID,
-        DESCRICAO, URGENCIA, ID_STATUS,
-        ID_CONTATO, ID_ATIVO, ID_TECNICO
+        CODCLIENTE, NUMERO_SERIE, SLAID, DESCRICAO, URGENCIA,
+        ID_STATUS_CHAMADO, ID_CONTATO, ID_ATIVO, ID_TECNICO,
+        ID_CONTRATO, RESOLUCAO, DATA_FECHAMENTO
     } = req.body;
 
     try {
+        // Obter estado anterior para histórico
+        const old = (await db.query('SELECT ID_STATUS_CHAMADO, ID_TECNICO FROM CHAMADOS WHERE ID_CHAMADO = ?', [id]))[0];
+
         const query = `
             UPDATE CHAMADOS 
             SET CODCLIENTE = ?, NUMERO_SERIE = ?, SLAID = ?,
-                DESCRICAO = ?, URGENCIA = ?, ID_STATUS = ?,
-                ID_CONTATO = ?, ID_ATIVO = ?, ID_TECNICO = ?
+                DESCRICAO = ?, URGENCIA = ?, ID_STATUS_CHAMADO = ?,
+                ID_CONTATO = ?, ID_ATIVO = ?, ID_TECNICO = ?,
+                ID_CONTRATO = ?, RESOLUCAO = ?, DATA_FECHAMENTO = ?,
+                DATA_MODIFICACAO = CURRENT_TIMESTAMP
             WHERE ID_CHAMADO = ?
         `;
         await db.query(query, [
-            CODCLIENTE || null,
-            NUMERO_SERIE || null,
-            SLAID || null,
-            DESCRICAO || null,
-            URGENCIA || null,
-            ID_STATUS || null,
-            ID_CONTATO || null,
-            ID_ATIVO || null,
-            ID_TECNICO || null,
+            CODCLIENTE || null, NUMERO_SERIE || null, SLAID || null,
+            DESCRICAO || null, URGENCIA || null, ID_STATUS_CHAMADO || null,
+            ID_CONTATO || null, ID_ATIVO || null, ID_TECNICO || null,
+            ID_CONTRATO || null, RESOLUCAO || null, DATA_FECHAMENTO || null,
             id
         ]);
+
+        // Registrar mudanças no histórico
+        if (old) {
+            if (ID_STATUS_CHAMADO && ID_STATUS_CHAMADO != old.ID_STATUS_CHAMADO) {
+                const sName = await db.query('SELECT NOME FROM STATUS_CHAMADO WHERE ID_STATUS_CHAMADO = ?', [ID_STATUS_CHAMADO]);
+                await db.query('INSERT INTO HISTORICO_CHAMADOS (ID_CHAMADO, TIPO, DESCRICAO) VALUES (?, ?, ?)',
+                    [id, 'STATUS', `Status alterado para: ${sName[0]?.NOME || ID_STATUS_CHAMADO}`]);
+            }
+            if (ID_TECNICO && ID_TECNICO != old.ID_TECNICO) {
+                const tName = await db.query('SELECT NOME FROM TECNICOS WHERE ID_TECNICO = ?', [ID_TECNICO]);
+                await db.query('INSERT INTO HISTORICO_CHAMADOS (ID_CHAMADO, TIPO, DESCRICAO) VALUES (?, ?, ?)',
+                    [id, 'ATRIBUICAO', `Técnico atribuído: ${tName[0]?.NOME || ID_TECNICO}`]);
+            }
+        }
+
         res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+    } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 app.delete('/api/chamados/:id', async (req, res) => {
-    const { id } = req.params;
     try {
-        await db.query('DELETE FROM CHAMADOS WHERE ID_CHAMADO = ?', [id]);
+        await db.query('DELETE FROM HISTORICO_CHAMADOS WHERE ID_CHAMADO = ?', [req.params.id]);
+        await db.query('DELETE FROM CHAMADOS WHERE ID_CHAMADO = ?', [req.params.id]);
         res.json({ success: true });
-    } catch (error) {
-        console.error('Error in DELETE /api/chamados:', error);
-        res.status(500).json({ error: error.message });
-    }
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// --- HISTÓRICO DE CHAMADOS API ---
+app.get('/api/chamados/:id/historico', async (req, res) => {
+    try {
+        const query = `
+            SELECT H.*, U.NOME as USUARIO_NOME, T.NOME as TECNICO_NOME
+            FROM HISTORICO_CHAMADOS H
+            LEFT JOIN USUARIOS U ON H.ID_USUARIO = U.ID_USUARIO
+            LEFT JOIN TECNICOS T ON H.ID_TECNICO = T.ID_TECNICO
+            WHERE H.ID_CHAMADO = ?
+            ORDER BY H.DATA_HORA DESC
+        `;
+        const result = await db.query(query, [req.params.id]);
+
+        const parsed = await Promise.all(result.map(async r => ({
+            ...r,
+            DESCRICAO: r.DESCRICAO ? (Buffer.isBuffer(r.DESCRICAO) ? r.DESCRICAO.toString() : r.DESCRICAO) : ''
+        })));
+
+        res.json(parsed);
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.post('/api/chamados/:id/historico', async (req, res) => {
+    const { TIPO, DESCRICAO, ID_USUARIO, ID_TECNICO } = req.body;
+    try {
+        await db.query(
+            `INSERT INTO HISTORICO_CHAMADOS (ID_CHAMADO, TIPO, DESCRICAO, ID_USUARIO, ID_TECNICO) VALUES (?, ?, ?, ?, ?)`,
+            [req.params.id, TIPO || 'COMENTARIO', DESCRICAO, ID_USUARIO || null, ID_TECNICO || null]
+        );
+        res.json({ success: true });
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// --- HISTÓRICO DE EQUIPAMENTO (POR SERIAL) ---
+app.get('/api/ativos/historico/:serial', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                C.TICKETID, C.DATA_HORA, C.DATA_FECHAMENTO, 
+                S.NOME as STATUS_NOME, T.NOME as TECNICO_NOME,
+                C.DESCRICAO, C.RESOLUCAO
+            FROM CHAMADOS C
+            LEFT JOIN STATUS_CHAMADO S ON C.ID_STATUS_CHAMADO = S.ID_STATUS_CHAMADO
+            LEFT JOIN TECNICOS T ON C.ID_TECNICO = T.ID_TECNICO
+            WHERE C.NUMERO_SERIE = ? OR C.ID_ATIVO = (SELECT ID_ATIVO FROM ATIVOS WHERE NUMERO_SERIE = ? ROWS 1)
+            ORDER BY C.DATA_HORA DESC
+        `;
+        const result = await db.query(query, [req.params.serial, req.params.serial]);
+        res.json(result);
+    } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 

@@ -672,144 +672,168 @@ class AppManager {
 
     async loadChamadosDashboard() {
         const kpiGrid = document.getElementById('chamados-kpi-grid');
-        const vencimentoMesTable = document.getElementById('vencimentoMesTableBody');
-        const slaTable = document.getElementById('contratosSLATableBody');
+        const vencimentoTbody = document.getElementById('vencimentoMesTableBody');
+        const slaTbody = document.getElementById('contratosSLATableBody');
 
         try {
             const res = await fetch('api/chamados/dashboard');
-            if (!res.ok) throw new Error('Erro ao buscar dados do dashboard');
             const data = await res.json();
-
-            const ativosStatus = data.ativosStatus || [];
-            const locados = ativosStatus.find(s => s.STATUS === 'Locado')?.QTD || 0;
-            const estoque = ativosStatus.find(s => s.STATUS === 'Estoque')?.QTD || 0;
-            const manutencao = ativosStatus.find(s => (s.STATUS || '').includes('Manutenção'))?.QTD || 0;
-
+            
+            // 1. Render KPIs
             if (kpiGrid) {
                 kpiGrid.innerHTML = `
                     <div class="kpi-card" style="border-left: 4px solid var(--primary-color)">
-                        <div class="kpi-title">Chamados Totais</div>
-                        <div class="kpi-value">${data.totalChamados || 0}</div>
+                        <div class="kpi-title">Abertos</div>
+                        <div class="kpi-value">${data.abertos || 0}</div>
                     </div>
                     <div class="kpi-card" style="border-left: 4px solid var(--secondary-color)">
-                        <div class="kpi-title">Contratos Ativos</div>
-                        <div class="kpi-value">${data.contratosAtivos || 0} <small style="font-size:0.5em; opacity:0.6">/ ${data.totalContratos || 0}</small></div>
+                        <div class="kpi-title">Encerrados</div>
+                        <div class="kpi-value">${data.encerrados || 0}</div>
                     </div>
-                    <div class="kpi-card" style="border-left: 4px solid #4f46e5">
-                        <div class="kpi-title">Equip. Locados</div>
-                        <div class="kpi-value">${locados}</div>
+                    <div class="kpi-card" style="border-left: 4px solid #ef4444">
+                        <div class="kpi-title">Atrasados (SLA)</div>
+                        <div class="kpi-value">${data.atrasados || 0}</div>
                     </div>
-                     <div class="kpi-card" style="border-left: 4px solid #f59e0b">
-                        <div class="kpi-title">Estoque / Manutenção</div>
-                        <div class="kpi-value">${estoque} <small style="font-size:0.5em; opacity:0.6">/</small> ${manutencao}</div>
+                     <div class="kpi-card" style="border-left: 4px solid #10b981">
+                        <div class="kpi-title">Total Geral</div>
+                        <div class="kpi-value">${(data.abertos || 0) + (data.encerrados || 0)}</div>
                     </div>
                 `;
             }
 
-            if (vencimentoMesTable) {
-                vencimentoMesTable.innerHTML = data.vencimentoMes && data.vencimentoMes.length > 0
-                    ? data.vencimentoMes.map(c => `
+            // 2. Render Vencimentos
+            if (vencimentoTbody) {
+                if (!data.vencimentoMes || data.vencimentoMes.length === 0) {
+                    vencimentoTbody.innerHTML = '<tr><td colspan="3" style="text-align:center">Nenhum contrato vencendo em breve.</td></tr>';
+                } else {
+                    vencimentoTbody.innerHTML = data.vencimentoMes.map(v => `
                         <tr>
-                            <td><strong>${c.DESCRICAO || 'S/D'}</strong></td>
-                            <td>${c.CLIENTE_NOME || '-'}</td>
-                            <td style="color:#f59e0b; font-weight:bold">${new Date(c.DATA_FIM).toLocaleDateString('pt-BR')}</td>
+                            <td>${v.DESCRICAO || '-'}</td>
+                            <td>${v.CLIENTE_NOME || '-'}</td>
+                            <td>${v.DATA_FIM ? new Date(v.DATA_FIM).toLocaleDateString() : '-'}</td>
                         </tr>
-                    `).join('')
-                    : '<tr><td colspan="3" style="text-align:center; padding: 20px;">Nenhum contrato vencendo este mês.</td></tr>';
+                    `).join('');
+                }
             }
 
-            if (slaTable) {
-                slaTable.innerHTML = data.contratosSLA && data.contratosSLA.length > 0
-                    ? data.contratosSLA.map(s => `
+            // 3. Render SLA Stats
+            if (slaTbody) {
+                if (!data.porSLA || data.porSLA.length === 0) {
+                    slaTbody.innerHTML = '<tr><td colspan="2" style="text-align:center">Sem dados de SLA.</td></tr>';
+                } else {
+                    slaTbody.innerHTML = data.porSLA.map(s => `
                         <tr>
-                            <td>${s.SLDESC || 'Sem SLA'}</td>
-                            <td><span class="badge" style="background:var(--primary-color)">${s.QTD} contratos</span></td>
+                            <td>${s.SLA_NOME}</td>
+                            <td>${s.QTD}</td>
                         </tr>
-                    `).join('')
-                    : '<tr><td colspan="2" style="text-align:center; padding: 20px;">Nenhum dado de SLA.</td></tr>';
+                    `).join('');
+                }
             }
-        } catch (e) { console.error(e); }
+
+        } catch (e) { 
+            console.error('Dashboard error:', e); 
+            if (vencimentoTbody) vencimentoTbody.innerHTML = '<tr><td colspan="3">Erro ao carregar dados.</td></tr>';
+        }
     }
 
     async loadChamadosList() {
-        const response = await fetch('api/chamados');
-        const data = await response.json();
-        this.renderChamados(data);
+        try {
+            const response = await fetch('api/chamados');
+            const data = await response.json();
+            this.renderChamados(data);
+        } catch (e) { console.error(e); }
+    }
+
+    renderChamados(data) {
+        const tbody = document.getElementById('chamadosTableBody');
+        if (!tbody) return;
+
+        tbody.innerHTML = data.map(c => {
+            // Escape single quotes for use in onclick handles to avoid SyntaxError: missing ) after argument list
+            const cData = encodeURIComponent(JSON.stringify(c)).replace(/'/g, "\\'");
+            const dataFmt = new Date(c.DATA_HORA).toLocaleString('pt-BR');
+            const slaFmt = c.DATA_PRAZO_SLA ? new Date(c.DATA_PRAZO_SLA).toLocaleString('pt-BR') : '-';
+            const urgencyColor = c.URGENCIA === 'Alta' ? '#ef4444' : (c.URGENCIA === 'Média' ? '#f59e0b' : '#3b82f6');
+
+            return `
+                <tr>
+                    <td><strong>${c.TICKETID}</strong></td>
+                    <td>${c.CLIENTE_NOME || '-'}</td>
+                    <td>${c.ATIVO_NOME || '-'}</td>
+                    <td><button class="btn-link" onclick="appManager.viewSerialHistory('${c.NUMERO_SERIE}')">${c.NUMERO_SERIE || '-'}</button></td>
+                    <td><small>${dataFmt}</small></td>
+                    <td><small>${slaFmt}</small></td>
+                    <td><span class="badge" style="background:${c.STATUS_COR || '#666'}">${c.STATUS_NOME || '-'}</span></td>
+                    <td><span style="color:${urgencyColor}; font-weight:bold">${c.URGENCIA}</span></td>
+                    <td>
+                        <button class="btn-icon" title="Ver Detalhes/Timeline" onclick="appManager.viewChamadoDetails('${cData}')">👁️</button>
+                        <button class="btn-icon" title="Editar" onclick="appManager.openChamadoModal('${cData}')">✏️</button>
+                        <button class="btn-icon" title="Excluir" onclick="appManager.deleteChamado(${c.ID_CHAMADO})">🗑️</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
     }
 
     async openChamadoModal(chamadoData = null) {
         const modal = document.getElementById('chamadoModal');
         const title = document.getElementById('chamadoModalTitle');
         const form = document.getElementById('chamadoForm');
-
         form.reset();
         document.getElementById('chamadoId').value = '';
 
-        // Load Options
         try {
-            const [clientsRes, slaRes, statusRes, ativoRes, contatoRes, tecnicoRes] = await Promise.all([
-                fetch('api/clientes'),
-                fetch('api/sla'),
-                fetch('api/status'),
-                fetch('api/ativos'),
-                fetch('api/contatos'),
-                fetch('api/tecnicos')
+            const [clients, slas, statuses, tecnicos, ativos] = await Promise.all([
+                fetch('api/clientes').then(r => r.json()),
+                fetch('api/sla').then(r => r.json()),
+                fetch('api/status-chamado').then(r => r.json()),
+                fetch('api/tecnicos').then(r => r.json().catch(() => [])),
+                fetch('api/ativos').then(r => r.json())
             ]);
-            const clients = await clientsRes.json();
-            const slas = await slaRes.json();
-            const statuses = await statusRes.json();
-            const ativos = await ativoRes.json();
-            const contatos = contatoRes.ok ? await contatoRes.json() : [];
-            const tecnicos = tecnicoRes.ok ? await tecnicoRes.json() : [];
 
-            const clientSelect = document.getElementById('chamadoClient');
-            clientSelect.innerHTML = '<option value="">Selecione um Cliente...</option>' +
+            document.getElementById('chamadoClient').innerHTML = '<option value="">Selecione...</option>' + 
                 clients.map(c => `<option value="${c.ID_CLIENTE}">${c.NOME_RAZAO}</option>`).join('');
-
-            const slaSelect = document.getElementById('chamadoSLA');
-            slaSelect.innerHTML = '<option value="">Selecione o SLA...</option>' +
+            
+            document.getElementById('chamadoSLA').innerHTML = '<option value="">Selecione...</option>' + 
                 slas.map(s => `<option value="${s.ID_SLA}">${s.SLDESC}</option>`).join('');
 
-            const statusSelect = document.getElementById('chamadoStatus');
-            statusSelect.innerHTML = '<option value="">Selecione o Status...</option>' +
-                statuses.map(s => `<option value="${s.ID_STATUS}">${s.STATUS}</option>`).join('');
+            document.getElementById('chamadoStatus').innerHTML = statuses.map(s => `<option value="${s.ID_STATUS_CHAMADO}">${s.NOME}</option>`).join('');
 
-            const ativoSelect = document.getElementById('chamadoAtivo');
-            ativoSelect.innerHTML = '<option value="">Nenhum Ativo Vinculado</option>' +
-                ativos.map(a => `<option value="${a.ID_ATIVO}">${a.DESCRICAO} (${a.NUMERO_SERIE || 'S/N'})</option>`).join('');
-
-            const contatoSelect = document.getElementById('chamadoContato');
-            contatoSelect.innerHTML = '<option value="">Nenhum Contato Vinculado</option>' +
-                contatos.map(c => `<option value="${c.ID_CONTATO}">${c.NOME_CONTATO}</option>`).join('');
-
-            const tecnicoSelect = document.getElementById('chamadoTecnico');
-            tecnicoSelect.innerHTML = '<option value="">Nenhum Técnico Vinculado</option>' +
+            document.getElementById('chamadoTecnico').innerHTML = '<option value="">Nenhum</option>' + 
                 tecnicos.map(t => `<option value="${t.ID_TECNICO}">${t.NOME}</option>`).join('');
 
-        } catch (e) {
-            console.error("Error loading options for Chamado Modal:", e);
-        }
+            document.getElementById('chamadoAtivo').innerHTML = '<option value="">Nenhum</option>' + 
+                ativos.map(a => `<option value="${a.ID_ATIVO}">${a.DESCRICAO} (${a.NUMERO_SERIE})</option>`).join('');
 
-        if (chamadoData) {
-            const chamado = JSON.parse(decodeURIComponent(chamadoData));
-            title.textContent = 'Editar Chamado';
-            document.getElementById('chamadoId').value = chamado.ID_CHAMADO;
-            document.getElementById('chamadoClient').value = chamado.CODCLIENTE || '';
-            document.getElementById('chamadoSerie').value = chamado.NUMERO_SERIE || '';
-            document.getElementById('chamadoSLA').value = chamado.SLAID || '';
-            document.getElementById('chamadoDescricao').value = chamado.DESCRICAO || '';
-            document.getElementById('chamadoUrgencia').value = chamado.URGENCIA || 'medium';
-            document.getElementById('chamadoStatus').value = chamado.ID_STATUS || 1;
-            document.getElementById('chamadoAtivo').value = chamado.ID_ATIVO || '';
-            document.getElementById('chamadoContato').value = chamado.ID_CONTATO || '';
-            document.getElementById('chamadoTecnico').value = chamado.ID_TECNICO || '';
-        } else {
-            title.textContent = 'Novo Chamado';
-            document.getElementById('chamadoStatus').value = 1;
-            document.getElementById('chamadoUrgencia').value = 'medium';
-            document.getElementById('chamadoDescricao').value = '';
-        }
-        modal.classList.add('active');
+            if (chamadoData) {
+                const c = JSON.parse(decodeURIComponent(chamadoData));
+                title.textContent = 'Editar Chamado ' + c.TICKETID;
+                document.getElementById('chamadoId').value = c.ID_CHAMADO;
+                document.getElementById('chamadoClient').value = c.CODCLIENTE || '';
+                await this.loadClientContracts(c.CODCLIENTE, c.ID_CONTRATO);
+                document.getElementById('chamadoSerie').value = c.NUMERO_SERIE || '';
+                document.getElementById('chamadoSLA').value = c.SLAID || '';
+                document.getElementById('chamadoDescricao').value = c.DESCRICAO || '';
+                document.getElementById('chamadoUrgencia').value = c.URGENCIA || 'Média';
+                document.getElementById('chamadoStatus').value = c.ID_STATUS_CHAMADO || '';
+                document.getElementById('chamadoTecnico').value = c.ID_TECNICO || '';
+                document.getElementById('chamadoAtivo').value = c.ID_ATIVO || '';
+            } else {
+                title.textContent = 'Novo Chamado Técnico';
+            }
+            modal.classList.add('active');
+        } catch (e) { alert('Erro ao carregar dados do formulário: ' + e.message); }
+    }
+
+    async loadClientContracts(clientId, selectedId = null) {
+        const select = document.getElementById('chamadoContrato');
+        if (!clientId) { select.innerHTML = '<option value="">Selecione o Cliente primeiro</option>'; return; }
+        try {
+            const res = await fetch(`api/contratos/cliente/${clientId}`);
+            const data = await res.json();
+            select.innerHTML = '<option value="">Nenhum Contrato Vinculado</option>' + 
+                data.map(c => `<option value="${c.ID_CONTRATO}" ${c.ID_CONTRATO == selectedId ? 'selected' : ''}>${c.DESCRICAO}</option>`).join('');
+        } catch (e) { select.innerHTML = '<option value="">Erro ao carregar contratos</option>'; }
     }
 
     async saveChamado() {
@@ -817,76 +841,141 @@ class AppManager {
         const data = {
             CODCLIENTE: document.getElementById('chamadoClient').value,
             NUMERO_SERIE: document.getElementById('chamadoSerie').value,
+            ID_CONTRATO: document.getElementById('chamadoContrato').value || null,
             SLAID: document.getElementById('chamadoSLA').value || null,
             DESCRICAO: document.getElementById('chamadoDescricao').value,
             URGENCIA: document.getElementById('chamadoUrgencia').value,
-            ID_STATUS: document.getElementById('chamadoStatus').value || 1,
-            ID_ATIVO: document.getElementById('chamadoAtivo').value || null,
-            ID_CONTATO: document.getElementById('chamadoContato').value || null,
-            ID_TECNICO: document.getElementById('chamadoTecnico').value || null
+            ID_STATUS_CHAMADO: document.getElementById('chamadoStatus').value,
+            ID_TECNICO: document.getElementById('chamadoTecnico').value || null,
+            ID_ATIVO: document.getElementById('chamadoAtivo').value || null
         };
 
-        if (!data.CODCLIENTE || !data.DESCRICAO) {
-            alert('Preencha pelo menos o Cliente e a Descrição!');
-            return;
-        }
+        if (!data.CODCLIENTE || !data.DESCRICAO) return alert('Cliente e Descrição são obrigatórios!');
 
         try {
             const method = id ? 'PUT' : 'POST';
             const url = id ? `api/chamados/${id}` : 'api/chamados';
-            const result = await (await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })).json();
-            if (!result.success) throw new Error(result.error || 'Erro ao salvar chamado');
-            this.closeModal('chamadoModal');
-            this.loadChamados();
-        } catch (e) { alert(e.message); }
+            const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+            const result = await res.json();
+            if (result.success) {
+                this.closeModal('chamadoModal');
+                this.loadChamadosList();
+                if (!id) alert('Chamado aberto! Ticket: ' + result.ticketId);
+            } else throw new Error(result.error);
+        } catch (e) { alert('Erro ao salvar chamado: ' + e.message); }
     }
 
     async deleteChamado(id) {
-        if (!confirm('Excluir chamado?')) return;
-        await fetch(`api/chamados/${id}`, { method: 'DELETE' });
-        this.loadChamados();
+        if (!confirm('Deseja realmente excluir este chamado e todo o seu histórico?\nEsta ação não pode ser desfeita.')) return;
+        try {
+            await fetch(`api/chamados/${id}`, { method: 'DELETE' });
+            this.loadChamadosList();
+        } catch (e) { alert(e.message); }
     }
 
-    renderChamados(data) {
-        const tbody = document.getElementById('chamadosTableBody');
-        if (!tbody) return;
+    // --- TIMELINE & DETAILS ---
+    async viewChamadoDetails(chamadoData) {
+        const c = JSON.parse(decodeURIComponent(chamadoData));
+        this.currentChamado = c;
+        const modal = document.getElementById('chamadoDetailsModal');
+        
+        document.getElementById('detalheTicketId').textContent = c.TICKETID;
+        document.getElementById('detalheCliente').textContent = c.CLIENTE_NOME || '-';
+        document.getElementById('detalheStatus').innerHTML = `<span class="badge" style="background:${c.STATUS_COR}">${c.STATUS_NOME}</span>`;
+        document.getElementById('detalheUrgencia').textContent = c.URGENCIA;
+        document.getElementById('detalheAtivo').textContent = c.ATIVO_NOME || '-';
+        document.getElementById('detalheSerial').textContent = c.NUMERO_SERIE || '-';
+        document.getElementById('detalheData').textContent = new Date(c.DATA_HORA).toLocaleString();
+        document.getElementById('detalhePrazo').textContent = c.DATA_PRAZO_SLA ? new Date(c.DATA_PRAZO_SLA).toLocaleString() : '-';
+        document.getElementById('detalheDescricao').textContent = c.DESCRICAO;
+        document.getElementById('detalheResolucao').value = c.RESOLUCAO || '';
 
-        if (!data || data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 1rem;">Nenhum chamado encontrado.</td></tr>';
-            return;
-        }
+        await this.loadChamadoTimeline(c.ID_CHAMADO);
+        modal.classList.add('active');
+    }
 
-        tbody.innerHTML = data.map(item => {
-            const dataStr = encodeURIComponent(JSON.stringify(item));
-            const dataHora = item.DATA_HORA ? new Date(item.DATA_HORA).toLocaleString('pt-BR') : '-';
+    async loadChamadoTimeline(id) {
+        const container = document.getElementById('chamadoTimeline');
+        container.innerHTML = 'Carregando histórico...';
+        try {
+            const res = await fetch(`api/chamados/${id}/historico`);
+            const data = await res.json();
+            container.innerHTML = data.length === 0 ? '<p style="opacity:0.5; text-align:center;">Nenhuma interação registrada.</p>' : 
+                data.map(h => `
+                    <div style="margin-bottom:15px; border-left:2px solid var(--primary-color); padding-left:10px; font-size:0.85em;">
+                        <div style="display:flex; justify-content:space-between; opacity:0.6; margin-bottom:3px;">
+                            <span><strong>${h.TIPO}</strong> por ${h.USUARIO_NOME || h.TECNICO_NOME || 'Sistema'}</span>
+                            <span>${new Date(h.DATA_HORA).toLocaleString()}</span>
+                        </div>
+                        <div>${h.DESCRICAO}</div>
+                    </div>
+                `).join('');
+        } catch (e) { container.innerHTML = 'Erro ao carregar timeline.'; }
+    }
 
-            let urgLabel = 'Média';
-            let urgColor = '#f59e0b';
-            if (item.URGENCIA === 'low') { urgLabel = 'Baixa'; urgColor = '#10b981'; }
-            if (item.URGENCIA === 'high') { urgLabel = 'Alta'; urgColor = '#ef4444'; }
+    async addTimelineComment() {
+        const input = document.getElementById('novoComentario');
+        const desc = input.value.trim();
+        if (!desc) return;
+        try {
+            const res = await fetch(`api/chamados/${this.currentChamado.ID_CHAMADO}/historico`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ TIPO: 'COMENTARIO', DESCRICAO: desc, ID_USUARIO: JSON.parse(localStorage.getItem('user'))?.ID_USUARIO })
+            });
+            if (res.ok) {
+                input.value = '';
+                this.loadChamadoTimeline(this.currentChamado.ID_CHAMADO);
+            }
+        } catch (e) { alert(e.message); }
+    }
 
-            let statusColor = 'var(--primary-color)';
-            if (item.STATUS_NOME === 'Concluído') statusColor = '#10b981';
-            if (item.STATUS_NOME === 'Aberto') statusColor = '#ef4444';
-            if (item.STATUS_NOME === 'Em Atendimento') statusColor = '#f59e0b';
+    async saveResolucao() {
+        const resText = document.getElementById('detalheResolucao').value;
+        try {
+            const r = await fetch(`api/chamados/${this.currentChamado.ID_CHAMADO}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ RESOLUCAO: resText })
+            });
+            if (r.ok) {
+                alert('Resolução atualizada!');
+                // Registrar no histórico também
+                await fetch(`api/chamados/${this.currentChamado.ID_CHAMADO}/historico`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ TIPO: 'RESOLUCAO', DESCRICAO: 'Resolução atualizada: ' + resText })
+                });
+                this.loadChamadoTimeline(this.currentChamado.ID_CHAMADO);
+            }
+        } catch (e) { alert(e.message); }
+    }
 
-            return `
-                <tr>
-                    <td><strong>${item.TICKETID || '-'}</strong></td>
-                    <td>${item.CLIENTE_NOME || '-'}</td>
-                    <td>${item.ATIVO_NOME || '-'}</td>
-                    <td>${item.NUMERO_SERIE || '-'}</td>
-                    <td>${dataHora}</td>
-                    <td><span class="badge" style="background:#4f46e5">${item.SLA_DESC || '-'}</span></td>
-                    <td><span class="badge" style="background:${statusColor}">${item.STATUS_NOME || 'Aberto'}</span></td>
-                    <td><span class="badge" style="background:${urgColor}">${urgLabel}</span></td>
-                    <td>
-                        <button class="btn-icon" onclick="appManager.openChamadoModal('${dataStr}')">✏️</button>
-                        <button class="btn-icon" onclick="appManager.deleteChamado(${item.ID_CHAMADO})">🗑️</button>
-                    </td>
-                </tr>
-            `;
-        }).join('');
+    async viewSerialHistory(serial) {
+        if (!serial || serial === '-') return;
+        const modal = document.getElementById('serialHistoryModal');
+        document.getElementById('histSerialTitle').textContent = serial;
+        const tbody = document.getElementById('serialHistoryTableBody');
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Carregando...</td></tr>';
+        
+        modal.classList.add('active');
+        try {
+            const res = await fetch(`api/ativos/historico/${serial}`);
+            const data = await res.json();
+            tbody.innerHTML = data.length === 0 ? '<tr><td colspan="5" style="text-align:center;">Nenhum histórico para este serial.</td></tr>' : 
+                data.map(h => `
+                    <tr>
+                        <td><strong>${h.TICKETID}</strong></td>
+                        <td><small>${new Date(h.DATA_HORA).toLocaleString()}</small></td>
+                        <td>${h.STATUS_NOME}</td>
+                        <td>${h.TECNICO_NOME || '-'}</td>
+                        <td style="font-size:0.85em; max-width:250px;">
+                            <strong>Sintoma:</strong> ${h.DESCRICAO || '-'}<br>
+                            <strong>Resolução:</strong> ${h.RESOLUCAO || '-'}
+                        </td>
+                    </tr>
+                `).join('');
+        } catch (e) { tbody.innerHTML = '<tr><td colspan="5">Erro ao carregar dados.</td></tr>'; }
     }
 
     // Helper methods to reduce duplication
