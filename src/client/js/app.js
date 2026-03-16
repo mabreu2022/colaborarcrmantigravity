@@ -225,6 +225,9 @@ class AppManager {
             if (document.getElementById('assetProduct')) {
                 document.getElementById('assetProduct').value = asset.ID_PRODUTO || '';
             }
+            if (document.getElementById('assetContract')) {
+                document.getElementById('assetContract').value = asset.ID_CONTRATO || '';
+            }
         } else {
             title.textContent = 'Novo Ativo';
         }
@@ -238,7 +241,8 @@ class AppManager {
             NUMERO_SERIE: document.getElementById('assetSerial').value,
             ID_STATUS: document.getElementById('assetStatusDb').value,
             ID_CLIENTE_PROPRIETARIO: document.getElementById('assetOwner').value || null,
-            ID_PRODUTO: document.getElementById('assetProduct')?.value || null
+            ID_PRODUTO: document.getElementById('assetProduct')?.value || null,
+            ID_CONTRATO: document.getElementById('assetContract')?.value || null
         };
 
         if (!data.DESCRICAO || !data.ID_STATUS) {
@@ -2538,6 +2542,25 @@ class AppManager {
         const assetOwner = document.getElementById('assetOwner');
         const assetStatusDb = document.getElementById('assetStatusDb');
         const userProfile = document.getElementById('userProfile');
+        const assetContract = document.getElementById('assetContract');
+
+        if (clientSelect) {
+            try {
+                const res = await fetch('api/clientes');
+                const clients = await res.json();
+                clientSelect.innerHTML = '<option value="">Selecione um cliente...</option>';
+                clients.forEach(c => clientSelect.options.add(new Option(c.NOME_RAZAO, c.ID_CLIENTE)));
+            } catch (e) { console.error('Error loading clients', e); }
+        }
+
+        if (assetContract) {
+            try {
+                const res = await fetch('api/contratos');
+                const contracts = await res.json();
+                assetContract.innerHTML = '<option value="">Selecione um contrato...</option>';
+                contracts.forEach(c => assetContract.options.add(new Option((c.DESCRICAO || `Contrato ${c.ID_CONTRATO}`), c.ID_CONTRATO)));
+            } catch (e) { console.error('Error loading contracts', e); }
+        }
 
         const clients = await (await fetch('api/clientes')).json();
 
