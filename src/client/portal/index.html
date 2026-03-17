@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Portal do Cliente Colaborar</title>
+    <link rel="stylesheet" href="css/portal.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="portal-body">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <span class="logo-icon">🚀</span>
+            <h2>Colaborar<span>Portal</span></h2>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-target="my-tickets">
+                <i>🎫</i> Meus Chamados
+            </a>
+            <a href="#" class="nav-item" data-target="new-ticket">
+                <i>➕</i> Novo Chamado
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <button onclick="portalManager.logout()" class="btn-logout">
+                <i>🚪</i> Sair
+            </button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="top-bar">
+            <div class="user-info">
+                <div class="user-avatar" id="userAvatar">?</div>
+                <div class="user-details">
+                    <span class="user-name" id="userName">Carregando...</span>
+                    <span class="user-client" id="userClientName">Empresa</span>
+                </div>
+            </div>
+        </header>
+
+        <section id="content-area" class="content-area">
+            <!-- Dynamic Content Loaded Here -->
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Carregando seus dados...</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal for Ticket Details -->
+    <div id="ticketDetailModal" class="modal-overlay">
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3>Detalhes do Chamado <span id="modalTicketId">#000</span></h3>
+                <button class="modal-close" onclick="portalManager.closeModal('ticketDetailModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="modalTicketBody">
+                <!-- Details here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Templates Section (Hidden) -->
+    <template id="tpl-my-tickets">
+        <div class="page-header">
+            <h1>Meus Chamados</h1>
+            <p>Acompanhe o status das suas solicitações</p>
+        </div>
+        <div class="card">
+            <div class="table-responsive">
+                <table class="portal-table">
+                    <thead>
+                        <tr>
+                            <th>Ticket</th>
+                            <th>Data</th>
+                            <th>Assunto</th>
+                            <th>Status/SLA</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ticketsListBody">
+                        <!-- Tickets loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-new-ticket">
+        <div class="page-header">
+            <h1>Nova Solicitação</h1>
+            <p>Preencha os dados abaixo para abrir um novo chamado técnico</p>
+        </div>
+        <div class="card form-card">
+            <form id="newTicketForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Contrato Relacionado</label>
+                        <select id="ticketContract" class="form-control" required onchange="portalManager.onContractChange()">
+                            <option value="">Selecione o contrato...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Equipamento (Ativo)</label>
+                        <select id="ticketAsset" class="form-control" required>
+                            <option value="">Selecione o contrato primeiro...</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Descreva o Problema ou Solicitação</label>
+                    <textarea id="ticketDesc" class="form-control" rows="5" placeholder="Detalhe o máximo possível para agilizarmos seu atendimento..." required></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Abrir Chamado Técnico</button>
+                    <button type="button" class="btn-secondary" onclick="portalManager.loadPage('my-tickets')">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </template>
+
+    <script src="js/portal_app.js"></script>
+</body>
+</html>

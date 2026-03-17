@@ -117,12 +117,19 @@ async function migrate() {
         // -------------------------------------------------------
         console.log('\n[4/7] Adicionando colunas em CHAMADOS...');
         const alterColumns = [
+            [`ALTER TABLE CHAMADOS ADD ID_CLIENTE INTEGER`,               'ID_CLIENTE'],
+            [`ALTER TABLE CHAMADOS ADD ID_CONTATO INTEGER`,               'ID_CONTATO'],
             [`ALTER TABLE CHAMADOS ADD ID_CONTRATO INTEGER`,              'ID_CONTRATO'],
+            [`ALTER TABLE CHAMADOS ADD ID_ATIVO INTEGER`,                 'ID_ATIVO'],
             [`ALTER TABLE CHAMADOS ADD ID_STATUS_CHAMADO INTEGER`,        'ID_STATUS_CHAMADO'],
+            [`ALTER TABLE CHAMADOS ADD DATA_ABERTURA TIMESTAMP`,          'DATA_ABERTURA'],
             [`ALTER TABLE CHAMADOS ADD DATA_FECHAMENTO TIMESTAMP`,        'DATA_FECHAMENTO'],
             [`ALTER TABLE CHAMADOS ADD DATA_PRAZO_SLA TIMESTAMP`,        'DATA_PRAZO_SLA'],
             [`ALTER TABLE CHAMADOS ADD RESOLUCAO BLOB SUB_TYPE TEXT`,    'RESOLUCAO'],
             [`ALTER TABLE CHAMADOS ADD DATA_MODIFICACAO TIMESTAMP`,       'DATA_MODIFICACAO'],
+            [`ALTER TABLE CHAMADOS ADD FASE VARCHAR(50)`,                'FASE'],
+            [`ALTER TABLE CHAMADOS ADD ORIGEM VARCHAR(50)`,              'ORIGEM'],
+            [`ALTER TABLE CHAMADOS ADD DESCRICAO BLOB SUB_TYPE TEXT`,     'DESCRICAO'],
         ];
         for (const [sql, col] of alterColumns) {
             try {
@@ -158,7 +165,7 @@ async function migrate() {
         // -------------------------------------------------------
         // 7. Atualizar status padrão dos chamados existentes
         // -------------------------------------------------------
-        console.log('\n[7/7] Atualizando chamados existentes...');
+        console.log('\n[7/8] Atualizando chamados existentes...');
         try {
             const statusAberto = await db.query(
                 `SELECT FIRST 1 ID_STATUS_CHAMADO FROM STATUS_CHAMADO WHERE NOME = 'Aberto'`
@@ -171,6 +178,23 @@ async function migrate() {
                 console.log('  ✓ Chamados existentes atualizados com status "Aberto".');
             }
         } catch (e) { console.log('  ~ Atualização erro:', e.message); }
+
+        // -------------------------------------------------------
+        // 8. Criar Trigger para TICKETID automático
+        // -------------------------------------------------------
+        console.log('\n[8/8] Criando trigger para TICKETID...');
+        try {
+            await db.query(`
+                CREATE OR ALTER TRIGGER TRG_CHAMADOS_TICKETID FOR CHAMADOS
+                ACTIVE BEFORE INSERT POSITION 1
+                AS
+                BEGIN
+                    IF (NEW.TICKETID IS NULL OR NEW.TICKETID = '') THEN
+                        NEW.TICKETID = 'CH-' || LPAD(GEN_ID(GEN_TICKET_ID, 1), 6, '0');
+                END
+            `);
+            console.log('  ✓ Trigger TRG_CHAMADOS_TICKETID criada/atualizada.');
+        } catch (e) { console.log('  ~ Erro ao criar trigger TICKETID:', e.message); }
 
         console.log('\n=== Migration concluída com sucesso! ===');
 

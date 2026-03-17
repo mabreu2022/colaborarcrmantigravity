@@ -22,10 +22,37 @@ const db = {
                 if (err) return reject(err);
 
                 console.log('DB QUERY:', query, params);
-                db.query(query, params, (err, result) => {
-                    db.detach(); // release connection back to pool
-                    if (err) return reject(err);
-                    resolve(result);
+                db.query(query, params, async (err, result) => {
+                    if (err) {
+                        db.detach();
+                        return reject(err);
+                    }
+
+                    // Process blobs if they exist in the result
+                    try {
+                        if (Array.isArray(result)) {
+                            for (let row of result) {
+                                for (let key in row) {
+                                    if (typeof row[key] === 'function') {
+                                        row[key] = await new Promise((res, rej) => {
+                                            row[key]((err, name, eventEmitter) => {
+                                                if (err) return rej(err);
+                                                let data = '';
+                                                eventEmitter.on('data', chunk => data += chunk.toString());
+                                                eventEmitter.on('end', () => res(data));
+                                                eventEmitter.on('error', rej);
+                                            });
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        db.detach();
+                        resolve(result);
+                    } catch (blobErr) {
+                        db.detach();
+                        reject(blobErr);
+                    }
                 });
             });
         });

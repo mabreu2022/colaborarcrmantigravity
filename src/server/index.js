@@ -27,9 +27,22 @@ app.use((req, res, next) => {
     next();
 });
 
-// Serve static files from client folder (for testing/production)
+// Serve static files from client folder
 const path = require('path');
-app.use(express.static(path.join(__dirname, '../client')));
+const clientPath = path.join(__dirname, '../client');
+
+// Allow access with or without '/client' prefix in URL
+app.use(express.static(clientPath));
+app.use('/client', express.static(clientPath));
+
+// Explicit Portal Routes to ensure correct HTML is served
+app.get(['/portal', '/client/portal'], (req, res) => {
+    res.sendFile(path.join(clientPath, 'portal/index.html'));
+});
+
+app.get(['/portal/login', '/client/portal/login'], (req, res) => {
+    res.sendFile(path.join(clientPath, 'portal/login.html'));
+});
 
 // Multer Setup for Logo Upload
 const multer = require('multer');
@@ -370,14 +383,14 @@ app.get('/api/clientes/:id/contatos', async (req, res) => {
  */
 app.post('/api/contatos', async (req, res) => {
 
-    const { ID_CLIENTE, NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO } = req.body;
+    const { ID_CLIENTE, NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO, SENHA } = req.body;
     try {
         const query = `
-            INSERT INTO CONTATOS (ID_CLIENTE, NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO, ATIVO, DATA_CADASTRO)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'S', CURRENT_DATE)
+            INSERT INTO CONTATOS (ID_CLIENTE, NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO, ATIVO, DATA_CADASTRO, SENHA)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'S', CURRENT_DATE, ?)
             RETURNING ID_CONTATO
         `;
-        const result = await db.query(query, [ID_CLIENTE, NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO]);
+        const result = await db.query(query, [ID_CLIENTE, NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO, SENHA || '123456']);
         res.json({ success: true, id: result.ID_CONTATO });
     } catch (error) {
         console.error("Error creating contact:", error);
@@ -410,14 +423,14 @@ app.post('/api/contatos', async (req, res) => {
 app.put('/api/contatos/:id', async (req, res) => {
 
     const { id } = req.params;
-    const { NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO } = req.body;
+    const { NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO, SENHA } = req.body;
     try {
         const query = `
             UPDATE CONTATOS 
-            SET NOME_CONTATO=?, TELEFONE_CONTATO=?, EMAIL_CONTATO=?, CARGO=?, OBSERVACAO=?, TIPO_CONTATO=?
+            SET NOME_CONTATO=?, TELEFONE_CONTATO=?, EMAIL_CONTATO=?, CARGO=?, OBSERVACAO=?, TIPO_CONTATO=?, SENHA=?
             WHERE ID_CONTATO = ?
         `;
-        await db.query(query, [NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO, id]);
+        await db.query(query, [NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO, SENHA, id]);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -1151,29 +1164,173 @@ app.delete('/api/usuarios/:id', async (req, res) => {
     }
 });
 
-app.post('/api/login', async (req, res) => {
-    const { email, password } = req.body;
-    try {
-        // Simple plain text check as per existing DB
-        const query = `
+app.post("/api/login", async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    // Simple plain text check as per existing DB
+    const query = `
             SELECT U.*, P.*
             FROM USUARIOS U
             LEFT JOIN PERFIS P ON U.ID_PERFIL = P.ID_PERFIL
             WHERE U.EMAIL = ? AND U.SENHA = ?
         `;
-        const result = await db.query(query, [email, password]);
+    const result = await db.query(query, [email, password]);
 
-        if (result.length > 0) {
-            const user = result[0];
-            // Don't send password back
-            delete user.SENHA;
-            res.json({ success: true, user });
-        } else {
-            res.status(401).json({ success: false, message: 'Credenciais inválidas' });
-        }
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+    if (result.length > 0) {
+      const user = result[0];
+      // Don't send password back
+      delete user.SENHA;
+      res.json({ success: true, user });
+    } else {
+      res.status(401).json({ success: false, message: "Credenciais inválidas" });
     }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Portal Login - Authenticantion for Contacts
+app.post("/api/portal/login", async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const query = `
+            SELECT C.*, CL.NOME_RAZAO as CLIENTE_NOME
+            FROM CONTATOS C
+            JOIN CLIENTES CL ON C.ID_CLIENTE = CL.ID_CLIENTE
+            WHERE C.EMAIL_CONTATO = ? AND C.SENHA = ? AND C.ATIVO = 'S'
+        `;
+    const result = await db.query(query, [email, password]);
+
+    if (result.length > 0) {
+      const user = result[0];
+      delete user.SENHA;
+      res.json({ success: true, user });
+    } else {
+      res
+        .status(401)
+        .json({ success: false, error: "E-mail ou senha incorretos." });
+    }
+  } catch (error) {
+    console.error("Portal login error:", error);
+    res.status(500).json({ error: "Erro interno no servidor." });
+  }
+});
+
+// Portal - Get Customer Tickets
+app.get("/api/portal/chamados", async (req, res) => {
+  const { contactId } = req.query;
+  try {
+    const query = `
+            SELECT 
+                CH.ID_CHAMADO, CH.TICKETID, CH.DATA_HORA as DATA_ABERTURA, CH.DESCRICAO,
+                S.NOME as STATUS_NOME, A.DESCRICAO as NOME_ATIVO
+            FROM CHAMADOS CH
+            LEFT JOIN STATUS_CHAMADO S ON CH.ID_STATUS_CHAMADO = S.ID_STATUS_CHAMADO
+            LEFT JOIN ATIVOS A ON CH.ID_ATIVO = A.ID_ATIVO
+            WHERE CH.ID_CONTATO = ?
+            ORDER BY CH.ID_CHAMADO DESC
+        `;
+    const result = await db.query(query, [contactId]);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Portal - Get Ticket Details
+app.get("/api/portal/chamados/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const query = `
+            SELECT 
+                CH.ID_CHAMADO, CH.TICKETID, CH.DATA_HORA as DATA_ABERTURA, CH.DESCRICAO, CH.RESOLUCAO,
+                S.NOME as STATUS_NOME, A.DESCRICAO as NOME_ATIVO, A.NUMERO_SERIE
+            FROM CHAMADOS CH
+            LEFT JOIN STATUS_CHAMADO S ON CH.ID_STATUS_CHAMADO = S.ID_STATUS_CHAMADO
+            LEFT JOIN ATIVOS A ON CH.ID_ATIVO = A.ID_ATIVO
+            WHERE CH.ID_CHAMADO = ?
+        `;
+    const result = await db.query(query, [id]);
+    if (result.length > 0) {
+      res.json(result[0]);
+    } else {
+      res.status(404).json({ error: "Chamado não encontrado" });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Portal - Get Customer Active Contracts
+app.get("/api/portal/contratos", async (req, res) => {
+  const { clientId } = req.query;
+  try {
+    const query = `
+            SELECT C.*, S.NOME as STATUS_NOME, C.DESCRICAO as NOME_CONTRATO, C.ID_CONTRATO as NUMERO_CONTRATO 
+            FROM CONTRATOS C
+            LEFT JOIN STATUS_CONTRATO S ON C.ID_STATUS = S.ID_STATUS
+            WHERE C.ID_CLIENTE = ? AND (S.NOME = 'Ativo' OR C.ID_STATUS = 1)
+        `;
+    const result = await db.query(query, [clientId]);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Portal - Get Assets by Contract
+app.get("/api/portal/ativos", async (req, res) => {
+  const { contractId } = req.query;
+  try {
+    const query = `
+            SELECT A.*, A.DESCRICAO as NOME_ATIVO 
+            FROM ATIVOS A
+            JOIN ATIVOS_CONTRATOS AC ON A.ID_ATIVO = AC.ID_ATIVO
+            WHERE AC.ID_CONTRATO = ?
+        `;
+    const result = await db.query(query, [contractId]);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Portal - Create New Ticket
+app.post("/api/portal/chamados", async (req, res) => {
+  const {
+    ID_CLIENTE,
+    ID_CONTATO,
+    ID_CONTRATO,
+    ID_ATIVO,
+    DESCRICAO,
+    ORIGEM,
+    FASE,
+  } = req.body;
+  try {
+    // Busca o ID do status 'Aberto' para garantir consistência
+    const statusResult = await db.query("SELECT ID_STATUS_CHAMADO FROM STATUS_CHAMADO WHERE NOME = 'Aberto' ROWS 1");
+    const idStatus = (statusResult && statusResult.length > 0) ? statusResult[0].ID_STATUS_CHAMADO : 1;
+
+    // Tenta inserir com o máximo de colunas, mas remove ORIGEM e FASE se necessário se elas falharem na migração
+    const sql = `
+            INSERT INTO CHAMADOS (CODCLIENTE, ID_CONTATO, ID_CONTRATO, ID_ATIVO, DESCRICAO, DATA_HORA, ID_STATUS_CHAMADO, URGENCIA)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, 'Normal')
+        `;
+    
+    await db.query(sql, [
+      ID_CLIENTE,
+      ID_CONTATO,
+      ID_CONTRATO ? parseInt(ID_CONTRATO) : null,
+      ID_ATIVO ? parseInt(ID_ATIVO) : null,
+      DESCRICAO,
+      idStatus
+    ]);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Critical error creating portal ticket:", error);
+    res.status(500).json({ error: "Erro ao salvar chamado: " + error.message });
+  }
 });
 
 // ... Agenda & Support ...

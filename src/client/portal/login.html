@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Portal do Cliente Colaborar</title>
+    <link rel="stylesheet" href="css/portal.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo">
+                    <span class="logo-icon">🚀</span>
+                    <h1>Colaborar<span>Portal</span></h1>
+                </div>
+                <p>Bem-vindo ao seu portal de suporte técnico</p>
+            </div>
+            
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="email">E-mail de Acesso</label>
+                    <div class="input-wrapper">
+                        <i class="icon">📧</i>
+                        <input type="email" id="email" placeholder="seu@email.com" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Senha</label>
+                    <div class="input-wrapper">
+                        <i class="icon">🔒</i>
+                        <input type="password" id="password" placeholder="••••••••" required>
+                    </div>
+                </div>
+
+                <div class="form-options">
+                    <label class="remember-me">
+                        <input type="checkbox"> Lembrar de mim
+                    </label>
+                    <a href="#" class="forgot-password">Esqueceu a senha?</a>
+                </div>
+                
+                <button type="submit" class="btn-login">
+                    <span>Entrar no Portal</span>
+                    <i class="btn-icon">→</i>
+                </button>
+                
+                <div id="loginError" class="login-error" style="display: none;">
+                    Credenciais inválidas. Tente novamente.
+                </div>
+            </form>
+            
+            <div class="login-footer">
+                <p>&copy; 2026 Colaborar CRM & Ativos. Todos os direitos reservados.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/portal_auth.js"></script>
+</body>
+</html>

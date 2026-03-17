@@ -1,38 +1,30 @@
-require('dotenv').config();
-const Firebird = require('node-firebird');
+const db = require('./db');
 
-const options = {
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    database: process.env.DB_DATABASE,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    lowercase_keys: false,
-    role: null,
-    pageSize: 4096
-};
-
-console.log("Connecting to:", options.host, options.database);
-
-Firebird.attach(options, function (err, db) {
-    if (err) {
-        console.error("Connection Error:", err);
-        return;
+async function debug() {
+    try {
+        console.log('--- DIAGNÓSTICO DE TABELAS (REFINADO) ---');
+        
+        const tables = ['CHAMADOS', 'CONTRATOS', 'ATIVOS', 'CONTATOS', 'STATUS_CHAMADO', 'STATUS_CONTRATO', 'ATIVOS_CONTRATO'];
+        
+        for (const table of tables) {
+            console.log(`\nEstrutura de ${table}:`);
+            try {
+                const result = await db.query(`SELECT FIRST 1 * FROM ${table}`);
+                if (result && result.length > 0) {
+                    console.log('Colunas:', Object.keys(result[0]).join(', '));
+                } else {
+                    console.log('Tabela vazia ou sem dados para exibir colunas.');
+                }
+            } catch (e) {
+                console.log('❌ Erro:', e.message);
+            }
+        }
+        
+    } catch (err) {
+        console.error('Erro no diagnóstico:', err);
+    } finally {
+        process.exit();
     }
+}
 
-    console.log("Connected. Querying ATIVOS...");
-
-    // 1. Get ATIVOS columns
-    db.query('SELECT FIRST 1 * FROM ATIVOS', function (err, result) {
-        if (err) console.error("ATIVOS Error:", err);
-        else console.log("ATIVOS Columns:", result.length ? Object.keys(result[0]) : "Empty Table");
-
-        // 2. Get STATUS columns
-        db.query('SELECT FIRST 1 * FROM "STATUS"', function (err, result) {
-            if (err) console.error("STATUS Error:", err);
-            else console.log("STATUS Columns:", result.length ? Object.keys(result[0]) : "Empty Table");
-
-            db.detach();
-        });
-    });
-});
+debug();
