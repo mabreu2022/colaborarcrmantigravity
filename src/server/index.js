@@ -3,6 +3,7 @@ const cors = require('cors');
 const db = require('./db');
 require('dotenv').config();
 const fs = require('fs'); // Added for .env writing
+const nodemailer = require('nodemailer');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -1454,9 +1455,10 @@ app.post("/api/portal/chamados", async (req, res) => {
         const sql = `
             INSERT INTO CHAMADOS (CODCLIENTE, ID_CONTATO, ID_CONTRATO, ID_ATIVO, DESCRICAO, DATA_HORA, ID_STATUS_CHAMADO, URGENCIA, NUMERO_SERIE)
             VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, 'Normal', ?)
+            RETURNING ID_CHAMADO
         `;
 
-        await db.query(sql, [
+        const result = await db.query(sql, [
             ID_CLIENTE,
             ID_CONTATO,
             ID_CONTRATO ? parseInt(ID_CONTRATO) : null,
@@ -1466,7 +1468,11 @@ app.post("/api/portal/chamados", async (req, res) => {
             NUMERO_SERIE
         ]);
 
-        res.json({ success: true });
+        if (result && result.ID_CHAMADO) {
+            sendTicketEmail(result.ID_CHAMADO);
+        }
+
+        res.json({ success: true, id: result ? result.ID_CHAMADO : null });
     } catch (error) {
         console.error("Critical error creating portal ticket:", error);
         res.status(500).json({ error: "Erro ao salvar chamado: " + error.message });
@@ -2830,6 +2836,9 @@ app.post('/api/chamados', async (req, res) => {
         );
 
         res.json({ success: true, id: result.ID_CHAMADO, ticketId });
+        
+        // Disparar e-mail de notificação
+        sendTicketEmail(result.ID_CHAMADO);
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
@@ -2974,6 +2983,133 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
     console.error('CRITICAL: Unhandled Rejection at:', promise, 'reason:', reason);
 });
+
+
+/**
+ * Envia e-mail de notificação para a equipe técnica sobre um novo chamado.
+ * @param {number} id_chamado ID do chamado no banco de dados
+ */
+async function sendTicketEmail(id_chamado) {
+    try {
+        console.log(`[Email] Preparando notificação para o chamado ID: ${id_chamado}`);
+        const query = `
+            SELECT 
+                CH.TICKETID, CH.DESCRICAO, CH.NUMERO_SERIE,
+                CL.NOME_RAZAO as EMPRESA_NOME,
+                CT.NOME_CONTATO, CT.EMAIL_CONTATO, CT.TELEFONE as CONTATO_FONE,
+                A.DESCRICAO as ATIVO_NOME
+            FROM CHAMADOS CH
+            LEFT JOIN CLIENTES CL ON CH.CODCLIENTE = CL.ID_CLIENTE
+            LEFT JOIN CONTATOS CT ON CH.ID_CONTATO = CT.ID_CONTATO
+            LEFT JOIN ATIVOS A ON CH.ID_ATIVO = A.ID_ATIVO
+            WHERE CH.ID_CHAMADO = ?
+        `;
+        const result = await db.query(query, [id_chamado]);
+        if (!result || result.length === 0) {
+            console.error(`[Email] Chamado ${id_chamado} não encontrado para envio de e-mail.`);
+            return;
+        }
+
+        const data = result[0];
+        
+        // Configuração do Transportador SMTP (GMail)
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST || 'smtp.gmail.com',
+            port: parseInt(process.env.SMTP_PORT) || 587,
+            secure: process.env.SMTP_PORT == 465, 
+            auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/"/g, '') : null
+            }
+        });
+
+        const techEmails = process.env.MAIL_TECH_TEAM || 'tecnica3@colaborar.com.br,lucas.silva@colaborar.com.br';
+        const contactEmail = data.EMAIL_CONTATO;
+
+        console.log(`[Email] Destinatários Técnicos: ${techEmails}`);
+        if (contactEmail) console.log(`[Email] Cópia para contato: ${contactEmail}`);
+
+        const mailOptions = {
+            from: process.env.MAILER_EMAIL,
+            to: techEmails,
+            cc: contactEmail || undefined,
+            subject: `[Novo Chamado] ${data.TICKETID || id_chamado} - ${data.EMPRESA_NOME || 'Cliente não identificado'}`,
+            html: `
+                <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 650px; margin: 20px auto; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                    <div style="background: linear-gradient(135deg, #004a99 0%, #0066cc 100%); color: #fff; padding: 30px; text-align: center;">
+                        <h1 style="margin: 0; font-size: 28px; font-weight: 600; letter-spacing: 1px;">Novo Chamado Aberto</h1>
+                        <p style="margin: 10px 0 0; opacity: 0.9; font-size: 16px;">Sistema de Gestão de Chamados - Colaborar CRM</p>
+                    </div>
+                    
+                    <div style="padding: 35px; background-color: #ffffff;">
+                        <p style="font-size: 16px; margin-bottom: 25px;">Olá Equipe Técnica,</p>
+                        <p style="font-size: 15px; color: #555; margin-bottom: 30px;">Um novo chamado de suporte foi registrado. Abaixo seguem os detalhes completos para atendimento:</p>
+                        
+                        <!-- Dados do Chamado -->
+                        <div style="background-color: #f8fbff; border-left: 4px solid #004a99; padding: 20px; border-radius: 0 8px 8px 0; margin-bottom: 25px;">
+                            <h3 style="margin: 0 0 15px; color: #004a99; font-size: 18px; border-bottom: 1px solid #e0e6ed; padding-bottom: 8px;">Detalhes do Ticket</h3>
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <tr>
+                                    <td style="padding: 6px 0; color: #666; width: 140px;"><strong>Ticket ID:</strong></td>
+                                    <td style="padding: 6px 0; color: #333;">${data.TICKETID || 'Gerando...'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 6px 0; color: #666; vertical-align: top;"><strong>Descrição:</strong></td>
+                                    <td style="padding: 6px 0; color: #333;">${data.DESCRICAO || 'Sem descrição'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 6px 0; color: #666;"><strong>Ativo:</strong></td>
+                                    <td style="padding: 6px 0; color: #333;">${data.ATIVO_NOME || 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 6px 0; color: #666;"><strong>Número de Série:</strong></td>
+                                    <td style="padding: 6px 0; color: #333;">${data.NUMERO_SERIE || 'N/A'}</td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!-- Dados do Cliente -->
+                        <div style="background-color: #fcfcfc; border: 1px solid #eeeeee; padding: 20px; border-radius: 8px;">
+                            <h3 style="margin: 0 0 15px; color: #444; font-size: 18px; border-bottom: 1px solid #eeeeee; padding-bottom: 8px;">Informações de Contato</h3>
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <tr>
+                                    <td style="padding: 6px 0; color: #666; width: 140px;"><strong>Empresa:</strong></td>
+                                    <td style="padding: 6px 0; color: #333;">${data.EMPRESA_NOME || 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 6px 0; color: #666;"><strong>Nome do Contato:</strong></td>
+                                    <td style="padding: 6px 0; color: #333;">${data.NOME_CONTATO || 'N/A'}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 6px 0; color: #666;"><strong>E-mail:</strong></td>
+                                    <td style="padding: 6px 0; color: #333;"><a href="mailto:${data.EMAIL_CONTATO}" style="color: #0066cc; text-decoration: none;">${data.EMAIL_CONTATO || 'N/A'}</a></td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 6px 0; color: #666;"><strong>Telefone:</strong></td>
+                                    <td style="padding: 6px 0; color: #333;">${data.CONTATO_FONE || 'Não informado'}</td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div style="margin-top: 35px; text-align: center;">
+                            <a href="https://connecttask.com.br" style="background-color: #004a99; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; transition: background 0.3s;">Acessar Painel do CRM</a>
+                        </div>
+                    </div>
+                    
+                    <div style="background-color: #f1f3f5; padding: 20px; text-align: center; font-size: 13px; color: #7f8c8d; border-top: 1px solid #e9ecef;">
+                        <p style="margin: 0;">Este é um e-mail automático enviado pelo <strong>Colaborar CRM</strong>.</p>
+                        <p style="margin: 5px 0 0;">Por favor, não responda a este e-mail diretamente.</p>
+                    </div>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`[Email] Notificação enviada com sucesso para o chamado ${data.TICKETID || id_chamado}`);
+    } catch (error) {
+        console.error('[Email] Erro ao enviar e-mail de chamado:', error);
+    }
+}
 
 // Start Server
 app.listen(port, '0.0.0.0', async () => {
