@@ -1082,6 +1082,7 @@ class AppManager {
       ]);
 
       this.currentClientContracts = contracts;
+      this.currentAtivos = assets;
 
       // Populate Contracts
       select.innerHTML =
@@ -1129,6 +1130,19 @@ class AppManager {
     } catch (e) {
       console.error("Error loading client details:", e);
       select.innerHTML = '<option value="">Erro ao carregar detalhes</option>';
+    }
+  }
+
+  onChamadoAtivoChange(id) {
+    if (!id || !this.currentAtivos) {
+      document.getElementById("chamadoSerie").value = "";
+      return;
+    }
+    const ativo = this.currentAtivos.find((a) => a.ID_ATIVO == id);
+    if (ativo) {
+      document.getElementById("chamadoSerie").value = ativo.NUMERO_SERIE || "";
+    } else {
+      document.getElementById("chamadoSerie").value = "";
     }
   }
 

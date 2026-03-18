@@ -1216,50 +1216,106 @@ app.post("/api/portal/login", async (req, res) => {
     }
 });
 
+// Helper to convert BLOB (function/stream) to String
+const processBlob = (blob) => {
+    return new Promise((resolve) => {
+        if (!blob) return resolve('');
+        if (typeof blob === 'string') return resolve(blob);
+        if (Buffer.isBuffer(blob)) return resolve(blob.toString('utf8'));
+        if (typeof blob === 'function') {
+            blob((err, name, eventEmitter) => {
+                if (err) return resolve('');
+                let data = '';
+                eventEmitter.on('data', chunk => data += chunk.toString('utf8'));
+                eventEmitter.on('end', () => resolve(data));
+                eventEmitter.on('error', () => resolve(''));
+            });
+        } else {
+            resolve(String(blob));
+        }
+    });
+};
+
 // Portal - Get Customer Tickets
 app.get("/api/portal/chamados", async (req, res) => {
-    const { contactId } = req.query;
-    console.log(`[Portal] GET /api/portal/chamados contactId=${contactId}`);
+    const { contactId, ticketId, dateStart, dateEnd, subject, status, serial } = req.query;
+    console.log(`[Portal] GET /api/portal/chamados filters:`, req.query);
     try {
-        const query = `
+        let query = `
             SELECT 
-                CH.ID_CHAMADO, CH.TICKETID, CH.DATA_HORA as DATA_ABERTURA, CH.DESCRICAO,
-                S.NOME as STATUS_NOME, A.DESCRICAO as NOME_ATIVO
+                CH.ID_CHAMADO, CH.TICKETID, 
+                COALESCE(CH.DATA_HORA, CH.DATA_ABERTURA) as DATA_ABERTURA, 
+                CH.DESCRICAO, CH.DATA_PRAZO_SLA,
+                COALESCE(CH.NUMERO_SERIE, A.NUMERO_SERIE) AS NUMERO_SERIE,
+                S.NOME as STATUS_NOME, A.DESCRICAO as NOME_ATIVO,
+                SLA.SLDESC as SLA_NOME
             FROM CHAMADOS CH
             LEFT JOIN STATUS_CHAMADO S ON CH.ID_STATUS_CHAMADO = S.ID_STATUS_CHAMADO
             LEFT JOIN ATIVOS A ON CH.ID_ATIVO = A.ID_ATIVO
+            LEFT JOIN CONTRATOS C ON CH.ID_CONTRATO = C.ID_CONTRATO
+            LEFT JOIN SLA ON COALESCE(CH.SLAID, C.SLAID) = SLA.ID_SLA
             WHERE CH.ID_CONTATO = ?
-            ORDER BY CH.ID_CHAMADO DESC
         `;
-        const result = await db.query(query, [contactId]);
+        const params = [contactId];
 
-        // Helper to convert BLOB (function/stream) to String
-        const processBlob = (blob) => {
-            return new Promise((resolve, reject) => {
-                if (!blob) return resolve('');
-                if (typeof blob === 'string') return resolve(blob);
-                if (Buffer.isBuffer(blob)) return resolve(blob.toString('utf8'));
-                if (typeof blob === 'function') {
-                    blob((err, name, eventEmitter) => {
-                        if (err) return resolve(''); // Resolve empty on error to not break list
-                        let data = '';
-                        eventEmitter.on('data', chunk => data += chunk.toString('utf8'));
-                        eventEmitter.on('end', () => resolve(data));
-                        eventEmitter.on('error', () => resolve(''));
-                    });
-                } else {
-                    resolve(String(blob));
+        if (ticketId) {
+            query += ` AND (CH.TICKETID CONTAINING ? OR CAST(CH.ID_CHAMADO AS VARCHAR(20)) CONTAINING ?)`;
+            params.push(ticketId.toUpperCase());
+            params.push(ticketId.toUpperCase());
+        }
+        if (dateStart) {
+            query += ` AND CAST(COALESCE(CH.DATA_HORA, CH.DATA_ABERTURA) AS DATE) >= ?`;
+            params.push(dateStart);
+        }
+        if (dateEnd) {
+            query += ` AND CAST(COALESCE(CH.DATA_HORA, CH.DATA_ABERTURA) AS DATE) <= ?`;
+            params.push(dateEnd);
+        }
+        if (subject) {
+            query += ` AND (CAST(CH.DESCRICAO AS VARCHAR(8190)) CONTAINING ? OR UPPER(CH.TICKETID) CONTAINING ?)`;
+            params.push(subject.toUpperCase());
+            params.push(subject.toUpperCase());
+        }
+        if (status) {
+            query += ` AND CH.ID_STATUS_CHAMADO = ?`;
+            params.push(status);
+        }
+        if (serial) {
+            query += ` AND (COALESCE(CH.NUMERO_SERIE, A.NUMERO_SERIE) CONTAINING ? OR UPPER(A.DESCRICAO) CONTAINING ?)`;
+            params.push(serial.toUpperCase());
+            params.push(serial.toUpperCase());
+        }
+
+        query += ` ORDER BY CH.ID_CHAMADO DESC`;
+        
+        const result = await db.query(query, params);
+
+        const parsed = await Promise.all(result.map(async row => {
+            const desc = await processBlob(row.DESCRICAO);
+            const nomeAtivo = await processBlob(row.NOME_ATIVO);
+            let prazoSla = row.DATA_PRAZO_SLA;
+
+            if (!prazoSla && row.SLA_NOME) {
+                const hoursMatch = row.SLA_NOME.match(/\d+/);
+                if (hoursMatch) {
+                    const hours = parseInt(hoursMatch[0]);
+                    const dataAbertura = row.DATA_ABERTURA ? new Date(row.DATA_ABERTURA) : new Date();
+                    const calculated = new Date(dataAbertura);
+                    calculated.setHours(calculated.getHours() + hours);
+                    prazoSla = calculated;
                 }
-            });
-        };
+            }
 
-        const parsed = await Promise.all(result.map(async row => ({
-            ...row,
-            DESCRICAO: await processBlob(row.DESCRICAO),
-            NOME_ATIVO: await processBlob(row.NOME_ATIVO)
-        })));
+            return {
+                ...row,
+                DESCRICAO: desc,
+                NOME_ATIVO: nomeAtivo,
+                DATA_PRAZO_SLA: prazoSla,
+                NUMERO_SERIE: row.NUMERO_SERIE || '-',
+                numero_serie: row.NUMERO_SERIE || '-' // Redundância para o frontend
+            };
+        }));
 
-        console.log(`[Portal] Chamados encontrados: ${parsed.length}`);
         res.json(parsed);
     } catch (error) {
         console.error('[Portal] Erro ao buscar chamados:', error);
@@ -1273,43 +1329,49 @@ app.get("/api/portal/chamados/:id", async (req, res) => {
     try {
         const query = `
             SELECT 
-                CH.ID_CHAMADO, CH.TICKETID, CH.DATA_HORA as DATA_ABERTURA, CH.DESCRICAO, CH.RESOLUCAO,
-                S.NOME as STATUS, A.DESCRICAO as NOME_ATIVO, A.NUMERO_SERIE
+                CH.*, 
+                COALESCE(CH.DATA_HORA, CH.DATA_ABERTURA) as DATA_ABERTURA, 
+                COALESCE(CH.NUMERO_SERIE, A.NUMERO_SERIE) AS NUMERO_SERIE,
+                S.NOME as STATUS_NOME, A.DESCRICAO as NOME_ATIVO,
+                SLA.SLDESC as SLA_NOME,
+                T.NOME as TECNICO_NOME, T.EMAIL as TECNICO_EMAIL, T.TELEFONE as TECNICO_FONE
             FROM CHAMADOS CH
             LEFT JOIN STATUS_CHAMADO S ON CH.ID_STATUS_CHAMADO = S.ID_STATUS_CHAMADO
             LEFT JOIN ATIVOS A ON CH.ID_ATIVO = A.ID_ATIVO
+            LEFT JOIN CONTRATOS C ON CH.ID_CONTRATO = C.ID_CONTRATO
+            LEFT JOIN SLA ON COALESCE(CH.SLAID, C.SLAID) = SLA.ID_SLA
+            LEFT JOIN TECNICOS T ON CH.ID_TECNICO = T.ID_TECNICO
             WHERE CH.ID_CHAMADO = ?
         `;
         const result = await db.query(query, [id]);
 
-        // Helper to convert BLOB (function/stream) to String
-        const processBlob = (blob) => {
-            return new Promise((resolve) => {
-                if (!blob) return resolve('');
-                if (typeof blob === 'string') return resolve(blob);
-                if (Buffer.isBuffer(blob)) return resolve(blob.toString('utf8'));
-                if (typeof blob === 'function') {
-                    blob((err, name, eventEmitter) => {
-                        if (err) return resolve('');
-                        let data = '';
-                        eventEmitter.on('data', chunk => data += chunk.toString('utf8'));
-                        eventEmitter.on('end', () => resolve(data));
-                        eventEmitter.on('error', () => resolve(''));
-                    });
-                } else {
-                    resolve(String(blob));
-                }
-            });
-        };
-
         if (result.length > 0) {
             const row = result[0];
+            const desc = await processBlob(row.DESCRICAO);
+            const resolucao = await processBlob(row.RESOLUCAO);
+            const nomeAtivo = await processBlob(row.NOME_ATIVO);
+            
+            let prazoSla = row.DATA_PRAZO_SLA;
+            if (!prazoSla && row.SLA_NOME) {
+                const hoursMatch = row.SLA_NOME.match(/\d+/);
+                if (hoursMatch) {
+                    const hours = parseInt(hoursMatch[0]);
+                    const dataAbertura = row.DATA_ABERTURA ? new Date(row.DATA_ABERTURA) : new Date();
+                    const calculated = new Date(dataAbertura);
+                    calculated.setHours(calculated.getHours() + hours);
+                    prazoSla = calculated;
+                }
+            }
+
             const parsed = {
                 ...row,
-                DESCRICAO: await processBlob(row.DESCRICAO),
-                RESOLUCAO: await processBlob(row.RESOLUCAO),
-                NOME_ATIVO: await processBlob(row.NOME_ATIVO),
-                SOLUCAO: await processBlob(row.RESOLUCAO) // Alias for frontend compatibility
+                DESCRICAO: desc,
+                RESOLUCAO: resolucao,
+                NOME_ATIVO: nomeAtivo,
+                DATA_PRAZO_SLA: prazoSla,
+                SOLUCAO: resolucao,
+                NUMERO_SERIE: row.NUMERO_SERIE || '-',
+                numero_serie: row.NUMERO_SERIE || '-'
             };
             res.json(parsed);
         } else {
@@ -1332,8 +1394,16 @@ app.get("/api/portal/contratos", async (req, res) => {
             WHERE C.ID_CLIENTE = ? AND (S.NOME = 'Ativo' OR C.ID_STATUS = 1)
         `;
         const result = await db.query(query, [clientId]);
-        res.json(result);
+
+        const parsed = await Promise.all(result.map(async row => ({
+            ...row,
+            NOME_CONTRATO: await processBlob(row.NOME_CONTRATO),
+            OBSERVACOES: await processBlob(row.OBSERVACOES)
+        })));
+
+        res.json(parsed);
     } catch (error) {
+        console.error('[Portal] Erro ao buscar contratos:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -1349,8 +1419,16 @@ app.get("/api/portal/ativos", async (req, res) => {
             WHERE AC.ID_CONTRATO = ?
         `;
         const result = await db.query(query, [contractId]);
-        res.json(result);
+
+        const parsed = await Promise.all(result.map(async row => ({
+            ...row,
+            NOME_ATIVO: await processBlob(row.NOME_ATIVO),
+            DESCRICAO: await processBlob(row.DESCRICAO)
+        })));
+
+        res.json(parsed);
     } catch (error) {
+        console.error('[Portal] Erro ao buscar ativos:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -1363,6 +1441,7 @@ app.post("/api/portal/chamados", async (req, res) => {
         ID_CONTRATO,
         ID_ATIVO,
         DESCRICAO,
+        NUMERO_SERIE,
         ORIGEM,
         FASE,
     } = req.body;
@@ -1373,8 +1452,8 @@ app.post("/api/portal/chamados", async (req, res) => {
 
         // Tenta inserir com o máximo de colunas, mas remove ORIGEM e FASE se necessário se elas falharem na migração
         const sql = `
-            INSERT INTO CHAMADOS (CODCLIENTE, ID_CONTATO, ID_CONTRATO, ID_ATIVO, DESCRICAO, DATA_HORA, ID_STATUS_CHAMADO, URGENCIA)
-            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, 'Normal')
+            INSERT INTO CHAMADOS (CODCLIENTE, ID_CONTATO, ID_CONTRATO, ID_ATIVO, DESCRICAO, DATA_HORA, ID_STATUS_CHAMADO, URGENCIA, NUMERO_SERIE)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, 'Normal', ?)
         `;
 
         await db.query(sql, [
@@ -1383,7 +1462,8 @@ app.post("/api/portal/chamados", async (req, res) => {
             ID_CONTRATO ? parseInt(ID_CONTRATO) : null,
             ID_ATIVO ? parseInt(ID_ATIVO) : null,
             DESCRICAO,
-            idStatus
+            idStatus,
+            NUMERO_SERIE
         ]);
 
         res.json({ success: true });
@@ -2645,6 +2725,7 @@ app.get('/api/chamados', async (req, res) => {
         const query = `
             SELECT 
                 C.*,
+                COALESCE(C.NUMERO_SERIE, ATV.NUMERO_SERIE) AS NUMERO_SERIE,
                 CL.NOME_RAZAO as CLIENTE_NOME,
                 SLA.SLDESC as SLA_DESC,
                 S.NOME as STATUS_NOME, S.COR as STATUS_COR, S.ENCERRA as STATUS_ENCERRA,
