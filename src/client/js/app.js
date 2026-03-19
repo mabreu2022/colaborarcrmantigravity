@@ -2270,6 +2270,7 @@ class AppManager {
     const id = document.getElementById("agendaId").value;
     const ID_CLIENTE = document.getElementById("agendaClient").value;
     const ID_CONTATO = document.getElementById("agendaContato").value;
+    const ID_CHAMADO = document.getElementById("agendaTicket").value;
     const ID_CONTRATO = document.getElementById("agendaContract").value;
     const ID_ATIVO = document.getElementById("agendaAsset").value;
 
@@ -2309,6 +2310,7 @@ class AppManager {
       ID_CLIENTE,
       ID_CONTATO,
       ID_CONTRATO,
+      ID_CHAMADO,
       ID_ATIVO,
       DATA_RETIRADA,
       HORARIO_INICIO,
@@ -2396,6 +2398,7 @@ class AppManager {
                             <tr>
                                 <th>Data Retirada</th>
                                 <th>Prev. Devolução</th>
+                                <th>Chamado</th>
                                 <th>Cliente</th>
                                 <th>Ativo</th>
                                 <th>Técnicos</th>
@@ -2408,7 +2411,7 @@ class AppManager {
 
     const renderRows = (list) => {
       if (!list || list.length === 0)
-        return '<tr><td colspan="7" style="text-align:center; padding: 1rem;">Nenhum agendamento encontrado.</td></tr>';
+        return '<tr><td colspan="8" style="text-align:center; padding: 1rem;">Nenhum agendamento encontrado.</td></tr>';
 
       return list
         .map((item) => {
@@ -2427,6 +2430,7 @@ class AppManager {
                     <tr>
                         <td>${dr}</td>
                         <td>${dp}</td>
+                        <td>${item.CH_TICKETID || "-"}</td>
                         <td>${item.CLIENTE_NOME || "-"}</td>
                         <td>${item.ATIVO_DESC || "-"}</td>
                         <td><small>${item.TECNICOS_NOMES || "-"}</small></td>
@@ -2520,26 +2524,32 @@ class AppManager {
     const clientId = document.getElementById("agendaClient").value;
     const contactSelect = document.getElementById("agendaContact");
     const contractSelect = document.getElementById("agendaContract");
+    const ticketSelect = document.getElementById("agendaTicket");
 
     contactSelect.innerHTML = '<option value="">Carregando...</option>';
     contractSelect.innerHTML = '<option value="">Carregando...</option>';
+    ticketSelect.innerHTML = '<option value="">Carregando...</option>';
 
     if (!clientId) {
       contactSelect.innerHTML =
         '<option value="">Selecione um Cliente primeiro...</option>';
       contractSelect.innerHTML =
         '<option value="">Selecione um Cliente primeiro...</option>';
+      ticketSelect.innerHTML =
+        '<option value="">Selecione um Cliente primeiro...</option>';
       return;
     }
 
     try {
-      const [contactsRes, contractsRes] = await Promise.all([
+      const [contactsRes, contractsRes, ticketsRes] = await Promise.all([
         fetch(`api/contatos?cliente=${clientId}`),
         fetch(`api/contratos/cliente/${clientId}`),
+        fetch(`api/chamados?cliente=${clientId}`),
       ]);
 
       const contacts = await contactsRes.json();
       const contracts = await contractsRes.json();
+      const tickets = await ticketsRes.json();
 
       // Populate Contacts
       contactSelect.innerHTML = '<option value="">Selecione...</option>';
@@ -2558,6 +2568,17 @@ class AppManager {
       contracts.forEach((c) => {
         contractSelect.options.add(
           new Option(c.DESCRICAO || `Contrato ${c.ID_CONTRATO}`, c.ID_CONTRATO),
+        );
+      });
+
+      // Populate Tickets
+      ticketSelect.innerHTML = '<option value="">Selecione...</option>';
+      if (tickets.length === 0)
+        ticketSelect.innerHTML =
+          '<option value="">Nenhum chamado encontrado</option>';
+      tickets.forEach((t) => {
+        ticketSelect.options.add(
+          new Option(`${t.TICKETID} - ${t.DESCRICAO.substring(0, 40)}...`, t.ID_CHAMADO),
         );
       });
     } catch (error) {
@@ -2668,6 +2689,7 @@ class AppManager {
         // Load contacts for this client
         // Assuming loadAgendaClientContacts is a new function or onAgendaClientChange handles this
         await this.onAgendaClientChange(); // Trigger load contacts/contracts for this client
+        document.getElementById("agendaTicket").value = item.ID_CHAMADO || "";
         document.getElementById("agendaContato").value = item.ID_CONTATO || "";
 
         document.getElementById("agendaContract").value =
@@ -3524,13 +3546,41 @@ class AppManager {
     const clientId = document.getElementById("agendaClient").value;
     const contactSelect = document.getElementById("agendaContato");
     const contractSelect = document.getElementById("agendaContract");
+    const ticketSelect = document.getElementById("agendaTicket");
 
     if (contactSelect)
       contactSelect.innerHTML = '<option value="">Selecione...</option>';
     if (contractSelect)
       contractSelect.innerHTML = '<option value="">Selecione...</option>';
+    if (ticketSelect)
+      ticketSelect.innerHTML = '<option value="">Selecione...</option>';
 
     if (!clientId) return;
+
+    // Load Tickets
+    try {
+      if (ticketSelect)
+        ticketSelect.innerHTML = '<option value="">Carregando...</option>';
+      const tickets = await (
+        await fetch(`api/chamados?cliente=${clientId}`)
+      ).json();
+      if (ticketSelect) {
+        ticketSelect.innerHTML = '<option value="">Selecione...</option>';
+        if (tickets.length === 0)
+          ticketSelect.innerHTML =
+            '<option value="">Nenhum chamado encontrado</option>';
+        tickets.forEach((t) =>
+          ticketSelect.options.add(
+            new Option(
+              `${t.TICKETID} - ${t.DESCRICAO.substring(0, 40)}...`,
+              t.ID_CHAMADO,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      console.error(e);
+    }
 
     // Load Contacts
     try {

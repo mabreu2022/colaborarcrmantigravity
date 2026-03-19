@@ -1605,6 +1605,7 @@ app.get('/api/agendamentos', async (req, res) => {
                 AG.ID_CLIENTE, C.NOME_RAZAO as CLIENTE_NOME,
                 AG.ID_CONTATO, CT.NOME_CONTATO,
                 AG.ID_CONTRATO, CN.DESCRICAO as CONTRATO_DESC,
+                AG.ID_CHAMADO, CH.TICKETID as CH_TICKETID,
                 AG.ID_ATIVO, A.DESCRICAO as ATIVO_DESC, A.NUMERO_SERIE,
                 AG.DATA_RETIRADA,
                 AG.HORARIO_INICIO,
@@ -1618,6 +1619,7 @@ app.get('/api/agendamentos', async (req, res) => {
             LEFT JOIN CLIENTES C ON AG.ID_CLIENTE = C.ID_CLIENTE
             LEFT JOIN CONTATOS CT ON AG.ID_CONTATO = CT.ID_CONTATO
             LEFT JOIN CONTRATOS CN ON AG.ID_CONTRATO = CN.ID_CONTRATO
+            LEFT JOIN CHAMADOS CH ON AG.ID_CHAMADO = CH.ID_CHAMADO
             LEFT JOIN ATIVOS A ON AG.ID_ATIVO = A.ID_ATIVO
             LEFT JOIN "STATUS" S ON AG.ID_STATUS = S.ID_STATUS
         `;
@@ -1702,12 +1704,13 @@ app.get('/api/agendamentos', async (req, res) => {
 });
 
 app.post('/api/agendamentos', async (req, res) => {
-    let { ID_CLIENTE, ID_CONTATO, ID_CONTRATO, ID_ATIVO, DATA_RETIRADA, HORARIO_INICIO, HORARIO_FIM, DATA_DEVOLUCAO_PREVISTA, DATA_DEVOLUCAO, OBSERVACAO, ID_STATUS, QUANTIDADE } = req.body;
+    let { ID_CLIENTE, ID_CONTATO, ID_CONTRATO, ID_CHAMADO, ID_ATIVO, DATA_RETIRADA, HORARIO_INICIO, HORARIO_FIM, DATA_DEVOLUCAO_PREVISTA, DATA_DEVOLUCAO, OBSERVACAO, ID_STATUS, QUANTIDADE } = req.body;
 
     // Sanitize input: Convert empty strings to NULL for Firebird compatibility
     if (ID_CLIENTE === '') ID_CLIENTE = null;
     if (ID_CONTATO === '') ID_CONTATO = null;
     if (ID_CONTRATO === '') ID_CONTRATO = null;
+    if (ID_CHAMADO === '') ID_CHAMADO = null;
     if (ID_ATIVO === '') ID_ATIVO = null;
     if (DATA_RETIRADA === '') DATA_RETIRADA = null;
     if (HORARIO_INICIO === '') HORARIO_INICIO = null;
@@ -1718,12 +1721,12 @@ app.post('/api/agendamentos', async (req, res) => {
 
     try {
         const query = `
-            INSERT INTO AGENDA (ID_CLIENTE, ID_CONTATO, ID_CONTRATO, ID_ATIVO, DATA_RETIRADA, HORARIO_INICIO, HORARIO_FIM, DATA_DEVOLUCAO_PREVISTA, DATA_DEVOLUCAO, OBSERVACAO, ID_STATUS, QUANTIDADE)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO AGENDA (ID_CLIENTE, ID_CONTATO, ID_CONTRATO, ID_CHAMADO, ID_ATIVO, DATA_RETIRADA, HORARIO_INICIO, HORARIO_FIM, DATA_DEVOLUCAO_PREVISTA, DATA_DEVOLUCAO, OBSERVACAO, ID_STATUS, QUANTIDADE)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING ID_AGENDA
         `;
         const result = await db.query(query, [
-            ID_CLIENTE, ID_CONTATO, ID_CONTRATO, ID_ATIVO, DATA_RETIRADA, HORARIO_INICIO, HORARIO_FIM, DATA_DEVOLUCAO_PREVISTA, DATA_DEVOLUCAO, OBSERVACAO, ID_STATUS, QUANTIDADE
+            ID_CLIENTE, ID_CONTATO, ID_CONTRATO, ID_CHAMADO, ID_ATIVO, DATA_RETIRADA, HORARIO_INICIO, HORARIO_FIM, DATA_DEVOLUCAO_PREVISTA, DATA_DEVOLUCAO, OBSERVACAO, ID_STATUS, QUANTIDADE
         ]);
 
         const newAgendaId = result.ID_AGENDA;
@@ -1747,12 +1750,13 @@ app.post('/api/agendamentos', async (req, res) => {
 app.put('/api/agendamentos/:id', async (req, res) => {
     const { id } = req.params;
     console.log('PUT /api/agendamentos/:id received:', id, req.body); // DEBUG
-    let { ID_CLIENTE, ID_CONTATO, ID_CONTRATO, ID_ATIVO, DATA_RETIRADA, HORARIO_INICIO, HORARIO_FIM, DATA_DEVOLUCAO_PREVISTA, DATA_DEVOLUCAO, OBSERVACAO, ID_STATUS, QUANTIDADE, tecnicos } = req.body;
+    let { ID_CLIENTE, ID_CONTATO, ID_CONTRATO, ID_CHAMADO, ID_ATIVO, DATA_RETIRADA, HORARIO_INICIO, HORARIO_FIM, DATA_DEVOLUCAO_PREVISTA, DATA_DEVOLUCAO, OBSERVACAO, ID_STATUS, QUANTIDADE, tecnicos } = req.body;
 
     // Sanitize input: Convert empty strings to NULL for Firebird compatibility
     if (ID_CLIENTE === '') ID_CLIENTE = null;
     if (ID_CONTATO === '') ID_CONTATO = null;
     if (ID_CONTRATO === '') ID_CONTRATO = null;
+    if (ID_CHAMADO === '') ID_CHAMADO = null;
     if (ID_ATIVO === '') ID_ATIVO = null;
     if (DATA_RETIRADA === '') DATA_RETIRADA = null;
     if (HORARIO_INICIO === '') HORARIO_INICIO = null;
@@ -1764,12 +1768,12 @@ app.put('/api/agendamentos/:id', async (req, res) => {
     try {
         const query = `
             UPDATE AGENDA SET
-            ID_CLIENTE =?, ID_CONTATO =?, ID_CONTRATO =?, ID_ATIVO =?,
+            ID_CLIENTE =?, ID_CONTATO =?, ID_CONTRATO =?, ID_CHAMADO =?, ID_ATIVO =?,
             DATA_RETIRADA =?, HORARIO_INICIO =?, HORARIO_FIM =?, DATA_DEVOLUCAO_PREVISTA =?, DATA_DEVOLUCAO =?,
             OBSERVACAO =?, ID_STATUS =?, QUANTIDADE =?
             WHERE ID_AGENDA =?
             `;
-        await db.query(query, [ID_CLIENTE, ID_CONTATO, ID_CONTRATO, ID_ATIVO, DATA_RETIRADA, HORARIO_INICIO, HORARIO_FIM, DATA_DEVOLUCAO_PREVISTA, DATA_DEVOLUCAO, OBSERVACAO, ID_STATUS, QUANTIDADE, id]);
+        await db.query(query, [ID_CLIENTE, ID_CONTATO, ID_CONTRATO, ID_CHAMADO, ID_ATIVO, DATA_RETIRADA, HORARIO_INICIO, HORARIO_FIM, DATA_DEVOLUCAO_PREVISTA, DATA_DEVOLUCAO, OBSERVACAO, ID_STATUS, QUANTIDADE, id]);
 
         // If returned (Data Devolucao Set), free the asset and sync to inventory
         if (DATA_DEVOLUCAO && ID_ATIVO) {
@@ -2727,8 +2731,9 @@ app.get('/api/chamados/dashboard', async (req, res) => {
  *     summary: List all tickets
  */
 app.get('/api/chamados', async (req, res) => {
+    const { cliente } = req.query;
     try {
-        const query = `
+        let query = `
             SELECT 
                 C.*,
                 COALESCE(C.NUMERO_SERIE, ATV.NUMERO_SERIE) AS NUMERO_SERIE,
@@ -2747,9 +2752,14 @@ app.get('/api/chamados', async (req, res) => {
             LEFT JOIN CONTATOS CO ON C.ID_CONTATO = CO.ID_CONTATO
             LEFT JOIN ATIVOS ATV ON C.ID_ATIVO = ATV.ID_ATIVO
             LEFT JOIN TECNICOS T ON C.ID_TECNICO = T.ID_TECNICO
-            ORDER BY C.DATA_HORA DESC
         `;
-        const result = await db.query(query);
+        const params = [];
+        if (cliente) {
+            query += ' WHERE C.CODCLIENTE = ? ';
+            params.push(cliente);
+        }
+        query += ' ORDER BY C.DATA_HORA DESC';
+        const result = await db.query(query, params);
 
         const processBlob = (blob) => {
             return new Promise((resolve, reject) => {
