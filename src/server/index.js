@@ -1,9 +1,10 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const db = require('./db');
 require('dotenv').config();
 const fs = require('fs'); // Added for .env writing
-const nodemailer = require('nodemailer');
+const nodemailer = require(path.join(__dirname, 'node_modules', 'nodemailer'));
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -29,7 +30,6 @@ app.use((req, res, next) => {
 });
 
 // Serve static files from client folder
-const path = require('path');
 const clientPath = path.join(__dirname, '../client');
 
 // Allow access with or without '/client' prefix in URL
