@@ -347,8 +347,16 @@ app.delete('/api/clientes/:id', async (req, res) => {
  *                 $ref: '#/components/schemas/Contato'
  */
 app.get('/api/contatos', async (req, res) => {
+    const { cliente } = req.query;
     try {
-        const result = await db.query('SELECT * FROM CONTATOS ORDER BY NOME_CONTATO');
+        let query = 'SELECT * FROM CONTATOS';
+        let params = [];
+        if (cliente) {
+            query += ' WHERE ID_CLIENTE = ?';
+            params.push(cliente);
+        }
+        query += ' ORDER BY NOME_CONTATO';
+        const result = await db.query(query, params);
         res.json(result);
     } catch (error) {
         res.status(500).json({ error: error.message });
