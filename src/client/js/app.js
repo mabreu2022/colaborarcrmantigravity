@@ -1035,6 +1035,15 @@ class AppManager {
         await this.loadClientContracts(c.CODCLIENTE, c.ID_CONTRATO);
         document.getElementById("chamadoSerie").value = c.NUMERO_SERIE || "";
         document.getElementById("chamadoSLA").value = c.SLAID || "";
+        
+        // If ticket has no SLA, but has a contract, try to use the contract's SLA
+        if (!c.SLAID && c.ID_CONTRATO && this.currentClientContracts) {
+          const contract = this.currentClientContracts.find(con => con.ID_CONTRATO == c.ID_CONTRATO);
+          if (contract && contract.SLAID) {
+            document.getElementById("chamadoSLA").value = contract.SLAID;
+          }
+        }
+
         document.getElementById("chamadoDescricao").value = c.DESCRICAO || "";
         document.getElementById("chamadoUrgencia").value =
           c.URGENCIA || "Média";
