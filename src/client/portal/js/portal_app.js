@@ -289,12 +289,12 @@ class PortalManager {
 
                 <div style="margin-top:20px">
                     <label style="color:#64748b; font-size: 0.8rem; display:block">Descrição do Problema</label>
-                    <div style="background:#f8fafc; padding:15px; border-radius:10px; border:1px solid #e2e8f0; margin-top:5px; white-space: pre-wrap;">${t.DESCRICAO}</div>
+                    <div style="background:#f8fafc; color: #1e293b; padding:15px; border-radius:10px; border:1px solid #e2e8f0; margin-top:5px; white-space: pre-wrap;">${t.DESCRICAO}</div>
                 </div>
                 ${t.SOLUCAO ? `
                 <div style="margin-top:20px">
                     <label style="color:#64748b; font-size: 0.8rem; display:block">Solução / Resposta</label>
-                    <div style="background:#f0f9ff; padding:15px; border-radius:10px; border:1px solid #bae6fd; margin-top:5px; white-space: pre-wrap;">${t.SOLUCAO}</div>
+                    <div style="background:#f0f9ff; color: #1e293b; padding:15px; border-radius:10px; border:1px solid #bae6fd; margin-top:5px; white-space: pre-wrap;">${t.SOLUCAO}</div>
                 </div>
                 ` : ''}
             `;
