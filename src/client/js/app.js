@@ -2296,6 +2296,19 @@ class AppManager {
     const ID_STATUS = document.getElementById("agendaStatus").value;
     const QUANTIDADE = document.getElementById("agendaQuantidade").value || 1;
 
+    if (!ID_CLIENTE) {
+      alert("Por favor, selecione um Cliente.");
+      return;
+    }
+    if (!ID_ATIVO) {
+      alert("Por favor, selecione um Ativo (Equipamento).");
+      return;
+    }
+    if (!DATA_RETIRADA) {
+      alert("Por favor, preencha a Data de Retirada.");
+      return;
+    }
+
     // Technicians
     const tecnicos = Array.from(
       document.querySelectorAll(
@@ -2520,101 +2533,7 @@ class AppManager {
     }
   }
 
-  async onAgendaClientChange() {
-    const clientId = document.getElementById("agendaClient").value;
-    const contactSelect = document.getElementById("agendaContact");
-    const contractSelect = document.getElementById("agendaContract");
-    const ticketSelect = document.getElementById("agendaTicket");
 
-    contactSelect.innerHTML = '<option value="">Carregando...</option>';
-    contractSelect.innerHTML = '<option value="">Carregando...</option>';
-    ticketSelect.innerHTML = '<option value="">Carregando...</option>';
-
-    if (!clientId) {
-      contactSelect.innerHTML =
-        '<option value="">Selecione um Cliente primeiro...</option>';
-      contractSelect.innerHTML =
-        '<option value="">Selecione um Cliente primeiro...</option>';
-      ticketSelect.innerHTML =
-        '<option value="">Selecione um Cliente primeiro...</option>';
-      return;
-    }
-
-    try {
-      const [contactsRes, contractsRes, ticketsRes] = await Promise.all([
-        fetch(`api/contatos?cliente=${clientId}`),
-        fetch(`api/contratos/cliente/${clientId}`),
-        fetch(`api/chamados?cliente=${clientId}`),
-      ]);
-
-      const contacts = await contactsRes.json();
-      const contracts = await contractsRes.json();
-      const tickets = await ticketsRes.json();
-
-      // Populate Contacts
-      contactSelect.innerHTML = '<option value="">Selecione...</option>';
-      if (contacts.length === 0)
-        contactSelect.innerHTML =
-          '<option value="">Nenhum contato encontrado</option>';
-      contacts.forEach((c) => {
-        contactSelect.options.add(new Option(c.NOME_CONTATO, c.ID_CONTATO));
-      });
-
-      // Populate Contracts
-      contractSelect.innerHTML = '<option value="">Selecione...</option>';
-      if (contracts.length === 0)
-        contractSelect.innerHTML =
-          '<option value="">Nenhum contrato ativo</option>';
-      contracts.forEach((c) => {
-        contractSelect.options.add(
-          new Option(c.DESCRICAO || `Contrato ${c.ID_CONTRATO}`, c.ID_CONTRATO),
-        );
-      });
-
-      // Populate Tickets
-      ticketSelect.innerHTML = '<option value="">Selecione...</option>';
-      if (tickets.length === 0)
-        ticketSelect.innerHTML =
-          '<option value="">Nenhum chamado encontrado</option>';
-      tickets.forEach((t) => {
-        ticketSelect.options.add(
-          new Option(`${t.TICKETID} - ${t.DESCRICAO.substring(0, 40)}...`, t.ID_CHAMADO),
-        );
-      });
-    } catch (error) {
-      console.error("Error loading dependent dropdowns:", error);
-      contactSelect.innerHTML = '<option value="">Erro ao carregar</option>';
-      contractSelect.innerHTML = '<option value="">Erro ao carregar</option>';
-    }
-  }
-
-  async onAgendaContractChange() {
-    const contractId = document.getElementById("agendaContract").value;
-    const assetSelect = document.getElementById("agendaAsset");
-
-    assetSelect.innerHTML = '<option value="">Carregando...</option>';
-
-    try {
-      let url = "api/ativos/disponiveis";
-      if (contractId) url += `?contrato=${contractId}`;
-
-      const res = await fetch(url);
-      const assets = await res.json();
-
-      assetSelect.innerHTML = '<option value="">Selecione...</option>';
-      if (assets.length === 0)
-        assetSelect.innerHTML =
-          '<option value="">Nenhum ativo disponível</option>';
-
-      assets.forEach((a) => {
-        const label = `${a.DESCRICAO} (${a.NUMERO_SERIE || "S/N"})`;
-        assetSelect.options.add(new Option(label, a.ID_ATIVO));
-      });
-    } catch (error) {
-      console.error("Error loading assets:", error);
-      assetSelect.innerHTML = '<option value="">Erro ao carregar</option>';
-    }
-  }
 
   async loadTechniciansSelection() {
     const container = document.getElementById("agendaTechniciansContainer");
@@ -2686,14 +2605,15 @@ class AppManager {
         // We need to set values.
 
         document.getElementById("agendaClient").value = item.ID_CLIENTE;
-        // Load contacts for this client
-        // Assuming loadAgendaClientContacts is a new function or onAgendaClientChange handles this
-        await this.onAgendaClientChange(); // Trigger load contacts/contracts for this client
         document.getElementById("agendaTicket").value = item.ID_CHAMADO || "";
-        document.getElementById("agendaContato").value = item.ID_CONTATO || "";
+        document.getElementById("agendaContract").value = item.ID_CONTRATO || "";
 
-        document.getElementById("agendaContract").value =
-          item.ID_CONTRATO || "";
+        // Trigger loading dependent dropdowns (contacts, contracts, assets)
+        await this.onAgendaClientChange();
+
+        // After loading the lists, select the specific items
+        document.getElementById("agendaContato").value = item.ID_CONTATO || "";
+        document.getElementById("agendaAsset").value = item.ID_ATIVO || "";
 
         const formatDate = (d) => (d ? d.split("T")[0] : "");
         const formatTime = (t) => {
@@ -3610,31 +3530,59 @@ class AppManager {
 
     // Update Locados List if on that tab
     this.searchLocados();
+    // Reset Asset List when client changes
+    this.onAgendaTicketChange();
+  }
+
+  async onAgendaTicketChange() {
+    const ticketId = document.getElementById("agendaTicket").value;
+    const clientId = document.getElementById("agendaClient").value;
+    const contractId = document.getElementById("agendaContract").value;
+    const assetSelect = document.getElementById("agendaAsset");
+
+    if (!assetSelect) return;
+    assetSelect.innerHTML = '<option value="">Carregando...</option>';
+
+    try {
+      let url = "api/ativos/disponiveis";
+      if (ticketId) {
+        // If ticket selected, show specifically the asset linked to it
+        url += `?chamado=${ticketId}`;
+      } else if (contractId) {
+        // If only contract selected
+        url += `?contrato=${contractId}`;
+      } else if (clientId) {
+        // If only client selected
+        url += `?cliente=${clientId}`;
+      }
+
+      const res = await fetch(url);
+      console.log(`Asset Fetch URL: ${url}`); // DEBUG
+      const assets = await res.json();
+
+      assetSelect.innerHTML = '<option value="">Selecione...</option>';
+      if (assets.length === 0)
+        assetSelect.innerHTML =
+          '<option value="">Nenhum ativo disponível</option>';
+
+      assets.forEach((a) => {
+        const label = `${a.DESCRICAO} (${a.NUMERO_SERIE || "S/N"})`;
+        assetSelect.options.add(new Option(label, a.ID_ATIVO));
+      });
+
+      // Auto-select if only one asset found (likely the one from the ticket)
+      if (assets.length === 1) {
+        assetSelect.value = assets[0].ID_ATIVO;
+      }
+    } catch (e) {
+      console.error("Error loading assets:", e);
+      assetSelect.innerHTML = '<option value="">Erro ao carregar</option>';
+    }
   }
 
   async onAgendaContractChange() {
-    // Load Assets (Available)
-    const assetSelect = document.getElementById("agendaAsset");
-    assetSelect.innerHTML = '<option value="">Selecione...</option>';
-
-    // Optimization: We could filter by contract if backend supported it,
-    // but currently we fetch "Available" assets.
-    // Also user said: "COMBOBOX LISTANDO OS CONTRATOS... E OUM COMBOBOX COM OS ATIVOS DESSE CONTRATO SELECIONADO"
-    // Since we don't have Items_Contrato, we assume "Assets available to be put on this contract".
-
-    try {
-      // Fetch ALL available assets
-      const assets = await (await fetch("api/ativos/disponiveis")).json();
-      assets.forEach((a) => {
-        assetSelect.options.add(
-          new Option(`${a.DESCRICAO} (${a.NUMERO_SERIE || "S/N"})`, a.ID_ATIVO),
-        );
-      });
-    } catch (e) {
-      console.error(e);
-    }
-
-    this.searchLocados();
+    // When contract changes, just re-trigger ticket/asset logic
+    this.onAgendaTicketChange();
   }
 
   switchTab(tabId) {

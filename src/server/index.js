@@ -1548,7 +1548,7 @@ app.get('/api/contratos/cliente/:id', async (req, res) => {
 // 3. Get Available Assets (Status "Estoque" = 2 usually, or filter all)
 app.get('/api/ativos/disponiveis', async (req, res) => {
     try {
-        const { contrato } = req.query;
+        const { contrato, cliente, chamado } = req.query;
 
         let query = `
             SELECT A.ID_ATIVO, A.DESCRICAO, A.NUMERO_SERIE, S.STATUS
@@ -1559,7 +1559,16 @@ app.get('/api/ativos/disponiveis', async (req, res) => {
 
         const params = [];
 
-        if (contrato) {
+        if (chamado) {
+            const idChamado = parseInt(chamado);
+            query = `
+                SELECT A.ID_ATIVO, A.DESCRICAO, A.NUMERO_SERIE, S.STATUS
+                FROM ATIVOS A
+                LEFT JOIN "STATUS" S ON A.ID_STATUS = S.ID_STATUS
+                WHERE A.ID_ATIVO IN (SELECT ID_ATIVO FROM CHAMADOS WHERE ID_CHAMADO = ?)
+            `;
+            params.push(idChamado);
+        } else if (contrato) {
             query = `
                 SELECT A.ID_ATIVO, A.DESCRICAO, A.NUMERO_SERIE, S.STATUS
                 FROM ATIVOS A
@@ -1569,9 +1578,21 @@ app.get('/api/ativos/disponiveis', async (req, res) => {
                 AND (S.STATUS LIKE '%Estoque%' OR S.STATUS LIKE '%Disponivel%' OR A.ID_STATUS = 2)
             `;
             params.push(contrato);
+        } else if (cliente) {
+            query = `
+                SELECT DISTINCT A.ID_ATIVO, A.DESCRICAO, A.NUMERO_SERIE, S.STATUS
+                FROM ATIVOS A
+                JOIN ATIVOS_CONTRATOS AC ON A.ID_ATIVO = AC.ID_ATIVO
+                JOIN CONTRATOS C ON AC.ID_CONTRATO = C.ID_CONTRATO
+                LEFT JOIN "STATUS" S ON A.ID_STATUS = S.ID_STATUS
+                WHERE C.ID_CLIENTE = ?
+                AND (S.STATUS LIKE '%Estoque%' OR S.STATUS LIKE '%Disponivel%' OR A.ID_STATUS = 2)
+            `;
+            params.push(cliente);
         }
 
         const result = await db.query(query, params);
+        console.log(`Assets Query [DEBUG]: chamado=${chamado}, contrato=${contrato}, cliente=${cliente} -> Found: ${result ? result.length : 0}`);
         res.json(result);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });

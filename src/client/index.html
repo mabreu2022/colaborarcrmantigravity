@@ -1038,7 +1038,7 @@
                         <div class="form-row">
                             <div class="form-group" style="flex:1">
                                 <label>Chamado</label>
-                                <select id="agendaTicket" class="form-control">
+                                <select id="agendaTicket" class="form-control" onchange="appManager.onAgendaTicketChange()">
                                     <option value="">Selecione um Cliente primeiro...</option>
                                 </select>
                             </div>
@@ -1367,7 +1367,7 @@
     </div>
 
     <script type="module" src="js/estoque.js?v=2"></script>
-    <script type="module" src="js/app.js?v=13"></script>
+    <script type="module" src="js/app.js?v=14"></script>
 </body>
 
 </html>
