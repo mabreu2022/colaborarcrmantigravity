@@ -350,6 +350,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     background-color: #F59E0B; /* Orange */
 }
 
+.status-inactive {
+    background-color: #64748b; /* Gray/Slate */
+}
+
 .header-actions {
     display: flex;
     align-items: center;

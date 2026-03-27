@@ -3200,6 +3200,7 @@ class AppManager {
     if (s.includes("locado") || s.includes("alugado")) return "status-locado";
     if (s.includes("manutenção") || s.includes("manutencao"))
       return "status-manutencao";
+    if (s.includes("inativo")) return "status-inactive";
     return "";
   }
 

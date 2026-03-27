@@ -192,7 +192,7 @@ app.get('/api/health', async (req, res) => {
 app.get('/api/clientes', async (req, res) => {
 
     try {
-        const result = await db.query('SELECT FIRST 50 * FROM CLIENTES ORDER BY NOME_RAZAO');
+        const result = await db.query("SELECT FIRST 50 * FROM CLIENTES WHERE ATIVO = 'S' ORDER BY NOME_RAZAO");
         // Trim and Uppercase CHAR fields for the frontend
         const trimmedResult = result.map(c => ({
             ...c,
@@ -320,7 +320,7 @@ app.delete('/api/clientes/:id', async (req, res) => {
 
     const { id } = req.params;
     try {
-        await db.query('DELETE FROM CLIENTES WHERE ID_CLIENTE = ?', [id]);
+        await db.query("UPDATE CLIENTES SET ATIVO = 'N' WHERE ID_CLIENTE = ?", [id]);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -520,6 +520,7 @@ app.get('/api/contratos', async (req, res) => {
             LEFT JOIN CLIENTES CL ON C.ID_CLIENTE = CL.ID_CLIENTE
             LEFT JOIN STATUS_CONTRATO S ON C.ID_STATUS = S.ID_STATUS
             LEFT JOIN SLA ON C.SLAID = SLA.ID_SLA
+            WHERE C.ID_STATUS = 1
         `;
         const result = await db.query(query);
 
@@ -667,7 +668,7 @@ app.delete('/api/contratos/:id', async (req, res) => {
 
     const { id } = req.params;
     try {
-        await db.query('DELETE FROM CONTRATOS WHERE ID_CONTRATO = ?', [id]);
+        await db.query("UPDATE CONTRATOS SET ID_STATUS = 2 WHERE ID_CONTRATO = ?", [id]);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -823,7 +824,7 @@ app.get('/api/ativos', async (req, res) => {
             LEFT JOIN CLIENTES C ON A.ID_CLIENTE_PROPRIETARIO = C.ID_CLIENTE
             LEFT JOIN "STATUS" S ON A.ID_STATUS = S.ID_STATUS
             LEFT JOIN ATIVOS_CONTRATOS AC ON A.ID_ATIVO = AC.ID_ATIVO
-            WHERE 1=1
+            WHERE COALESCE(A.ID_STATUS, 0) <> 5
         `;
         const params = [];
         if (cliente) {
@@ -981,7 +982,7 @@ async function syncAssetToInventory(idAtivo, statusId) {
 app.delete('/api/ativos/:id', async (req, res) => {
 
     try {
-        await db.query('DELETE FROM ATIVOS WHERE ID_ATIVO = ?', [req.params.id]);
+        await db.query('UPDATE ATIVOS SET ID_STATUS = 5 WHERE ID_ATIVO = ?', [req.params.id]);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -1512,7 +1513,7 @@ app.get('/api/contratos/cliente/:id', async (req, res) => {
             SELECT C.ID_CONTRATO, C.DESCRICAO, S.NOME as STATUS, C.SLAID
             FROM CONTRATOS C
             LEFT JOIN STATUS_CONTRATO S ON C.ID_STATUS = S.ID_STATUS
-            WHERE C.ID_CLIENTE = ?
+            WHERE C.ID_CLIENTE = ? AND C.ID_STATUS = 1
         `;
         const result = await db.query(query, [req.params.id]);
 
