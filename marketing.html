@@ -1,0 +1,1491 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Colaborar CRM – Gestão Inteligente de Contratos e Suporte</title>
+  <meta name="description"
+    content="Colaborar CRM é a plataforma completa para gestão de clientes, contratos, ativos, chamados e agendamentos. Tudo integrado, em tempo real." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet" />
+  <style>
+    :root {
+      --brand: #002738;
+      --brand-mid: #003d57;
+      --brand-light: #005880;
+      --accent: #00c2f3;
+      --accent-dim: #00a8d4;
+      --gold: #f0c060;
+      --text: #e8f4fa;
+      --muted: #8eb5c8;
+      --surface: rgba(255, 255, 255, .05);
+      --surface2: rgba(255, 255, 255, .09);
+      --border: rgba(255, 255, 255, .10);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow: 0 24px 60px rgba(0, 0, 0, .45);
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--brand);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* ───── NOISE OVERLAY ───── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ───── NAV ───── */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 6%;
+      background: rgba(0, 39, 56, .88);
+      backdrop-filter: blur(18px);
+      border-bottom: 1px solid var(--border);
+      transition: box-shadow .3s;
+    }
+
+    nav.scrolled {
+      box-shadow: 0 4px 32px rgba(0, 0, 0, .5);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .nav-logo img {
+      height: 36px;
+    }
+
+    .nav-logo span {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -.5px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: .9rem;
+      font-weight: 500;
+      transition: color .2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--accent);
+    }
+
+    .nav-cta {
+      background: var(--accent);
+      color: var(--brand);
+      padding: 10px 24px;
+      border-radius: 40px;
+      font-weight: 700;
+      font-size: .9rem;
+      text-decoration: none;
+      transition: background .2s, transform .15s;
+      white-space: nowrap;
+    }
+
+    .nav-cta:hover {
+      background: #00d9ff;
+      transform: translateY(-1px);
+    }
+
+    /* ───── HERO ───── */
+    #hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 120px 6% 80px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-glow {
+      position: absolute;
+      width: 700px;
+      height: 700px;
+      background: radial-gradient(circle, rgba(0, 194, 243, .18) 0%, transparent 70%);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -60%);
+      pointer-events: none;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 194, 243, .12);
+      border: 1px solid rgba(0, 194, 243, .30);
+      color: var(--accent);
+      padding: 6px 18px;
+      border-radius: 40px;
+      font-size: .8rem;
+      font-weight: 600;
+      letter-spacing: .5px;
+      margin-bottom: 28px;
+      animation: fadeDown .6s ease both;
+    }
+
+    .hero-badge::before {
+      content: '●';
+      font-size: .5rem;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .3
+      }
+    }
+
+    @keyframes fadeDown {
+      from {
+        opacity: 0;
+        transform: translateY(-16px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(24px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0
+      }
+
+      to {
+        opacity: 1
+      }
+    }
+
+    .hero-title {
+      font-size: clamp(2.6rem, 6vw, 5rem);
+      font-weight: 900;
+      line-height: 1.08;
+      letter-spacing: -2px;
+      animation: fadeDown .7s .1s ease both;
+    }
+
+    .hero-title .highlight {
+      background: linear-gradient(100deg, var(--accent), #7dd9ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-sub {
+      max-width: 620px;
+      margin: 24px auto 0;
+      color: var(--muted);
+      font-size: 1.15rem;
+      line-height: 1.7;
+      animation: fadeDown .7s .2s ease both;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 40px;
+      animation: fadeUp .7s .35s ease both;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #0099cc);
+      color: var(--brand);
+      padding: 16px 36px;
+      border-radius: 40px;
+      font-weight: 800;
+      font-size: 1rem;
+      text-decoration: none;
+      box-shadow: 0 8px 30px rgba(0, 194, 243, .35);
+      transition: transform .15s, box-shadow .15s;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(0, 194, 243, .5);
+    }
+
+    .btn-ghost {
+      border: 1.5px solid var(--border);
+      color: var(--text);
+      padding: 16px 36px;
+      border-radius: 40px;
+      font-weight: 600;
+      font-size: 1rem;
+      text-decoration: none;
+      transition: border-color .2s, background .2s;
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--accent);
+      background: rgba(0, 194, 243, .07);
+    }
+
+    /* hero stats */
+    .hero-stats {
+      display: flex;
+      gap: 48px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 64px;
+      animation: fadeIn .8s .5s ease both;
+    }
+
+    .hero-stat {
+      text-align: center;
+    }
+
+    .hero-stat-num {
+      font-size: 2rem;
+      font-weight: 900;
+      color: var(--accent);
+    }
+
+    .hero-stat-lbl {
+      font-size: .8rem;
+      color: var(--muted);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+    }
+
+    /* ───── SECTION SHARED ───── */
+    section {
+      position: relative;
+      z-index: 1;
+    }
+
+    .section-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 100px 6%;
+    }
+
+    .section-badge {
+      display: inline-block;
+      background: rgba(0, 194, 243, .10);
+      border: 1px solid rgba(0, 194, 243, .25);
+      color: var(--accent);
+      padding: 5px 16px;
+      border-radius: 40px;
+      font-size: .78rem;
+      font-weight: 700;
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -1px;
+    }
+
+    .section-sub {
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.7;
+      max-width: 560px;
+      margin-top: 12px;
+    }
+
+    /* ───── MODULES GRID ───── */
+    #modules {
+      background: linear-gradient(180deg, var(--brand) 0%, var(--brand-mid) 100%);
+    }
+
+    .modules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
+      margin-top: 56px;
+    }
+
+    .module-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      transition: transform .25s, border-color .25s, box-shadow .25s;
+      cursor: default;
+    }
+
+    .module-card:hover {
+      transform: translateY(-6px);
+      border-color: rgba(0, 194, 243, .35);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, .35);
+    }
+
+    .module-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+    }
+
+    .module-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+
+    .module-desc {
+      color: var(--muted);
+      font-size: .9rem;
+      line-height: 1.65;
+    }
+
+    .module-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .module-tag {
+      background: rgba(0, 194, 243, .08);
+      border: 1px solid rgba(0, 194, 243, .18);
+      color: var(--accent);
+      font-size: .72rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+
+    /* ───── FEATURES SPLIT ───── */
+    #features {
+      background: var(--brand-mid);
+    }
+
+    .features-list {
+      display: flex;
+      flex-direction: column;
+      gap: 80px;
+      margin-top: 60px;
+    }
+
+    .feature-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: center;
+    }
+
+    .feature-row.reverse {
+      direction: rtl;
+    }
+
+    .feature-row.reverse>* {
+      direction: ltr;
+    }
+
+    .feature-visual {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 36px;
+      min-height: 280px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-visual::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 180px;
+      height: 180px;
+      background: radial-gradient(circle, rgba(0, 194, 243, .12) 0%, transparent 70%);
+    }
+
+    .fv-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255, 255, 255, .05);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+    }
+
+    .fv-icon {
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+
+    .fv-label {
+      font-size: .88rem;
+      color: var(--muted);
+      flex: 1;
+    }
+
+    .fv-value {
+      font-size: .88rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .fv-badge {
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: .72rem;
+      font-weight: 700;
+    }
+
+    .badge-green {
+      background: rgba(34, 197, 94, .15);
+      color: #4ade80;
+    }
+
+    .badge-blue {
+      background: rgba(0, 194, 243, .15);
+      color: var(--accent);
+    }
+
+    .badge-orange {
+      background: rgba(251, 146, 60, .15);
+      color: #fb923c;
+    }
+
+    .badge-red {
+      background: rgba(239, 68, 68, .15);
+      color: #f87171;
+    }
+
+    .badge-purple {
+      background: rgba(167, 139, 250, .15);
+      color: #a78bfa;
+    }
+
+    .feature-content {
+      padding: 0 8px;
+    }
+
+    .feature-tag {
+      display: inline-block;
+      background: rgba(0, 194, 243, .08);
+      border: 1px solid rgba(0, 194, 243, .2);
+      color: var(--accent);
+      font-size: .78rem;
+      font-weight: 700;
+      padding: 4px 14px;
+      border-radius: 40px;
+      letter-spacing: .5px;
+      margin-bottom: 18px;
+    }
+
+    .feature-title {
+      font-size: clamp(1.5rem, 2.5vw, 2rem);
+      font-weight: 800;
+      line-height: 1.2;
+      letter-spacing: -.5px;
+      margin-bottom: 16px;
+    }
+
+    .feature-desc {
+      color: var(--muted);
+      font-size: .95rem;
+      line-height: 1.75;
+      margin-bottom: 24px;
+    }
+
+    .feature-bullets {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .feature-bullets li {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      font-size: .9rem;
+      color: var(--muted);
+    }
+
+    .feature-bullets li::before {
+      content: '✓';
+      color: var(--accent);
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* ───── PORTAL SECTION ───── */
+    #portal {
+      background: linear-gradient(180deg, var(--brand-mid) 0%, #001e2d 100%);
+    }
+
+    .portal-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: center;
+      margin-top: 56px;
+    }
+
+    .portal-visual {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .portal-header {
+      background: rgba(0, 194, 243, .08);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .portal-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .portal-dot.r {
+      background: #f87171;
+    }
+
+    .portal-dot.y {
+      background: #fbbf24;
+    }
+
+    .portal-dot.g {
+      background: #4ade80;
+    }
+
+    .portal-url {
+      flex: 1;
+      background: rgba(255, 255, 255, .07);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: .78rem;
+      color: var(--muted);
+    }
+
+    .portal-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .ticket-card {
+      background: rgba(255, 255, 255, .05);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background .2s;
+    }
+
+    .ticket-card:hover {
+      background: rgba(255, 255, 255, .09);
+    }
+
+    .ticket-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .ticket-id {
+      font-size: .78rem;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .ticket-desc {
+      font-size: .88rem;
+      color: var(--text);
+    }
+
+    .ticket-meta {
+      font-size: .75rem;
+      color: var(--muted);
+    }
+
+    .portal-content {}
+
+    .portal-features {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-top: 28px;
+    }
+
+    .pf-item {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .pf-icon {
+      width: 40px;
+      height: 40px;
+      flex-shrink: 0;
+      background: rgba(0, 194, 243, .10);
+      border: 1px solid rgba(0, 194, 243, .2);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+    }
+
+    .pf-title {
+      font-size: .95rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .pf-desc {
+      font-size: .85rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    /* ───── SECURITY ───── */
+    #security {
+      background: #001e2d;
+    }
+
+    .security-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 20px;
+      margin-top: 48px;
+    }
+
+    .sec-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      transition: transform .2s, border-color .2s;
+    }
+
+    .sec-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(0, 194, 243, .3);
+    }
+
+    .sec-icon {
+      font-size: 1.8rem;
+      margin-bottom: 14px;
+    }
+
+    .sec-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .sec-desc {
+      font-size: .85rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* ───── TECH STACK ───── */
+    #tech {
+      background: linear-gradient(180deg, #001e2d 0%, var(--brand) 100%);
+    }
+
+    .tech-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 40px;
+    }
+
+    .tech-badge {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 22px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: .9rem;
+      font-weight: 600;
+      transition: transform .2s, border-color .2s;
+    }
+
+    .tech-badge:hover {
+      transform: translateY(-3px);
+      border-color: var(--accent);
+    }
+
+    .tech-badge span {
+      font-size: 1.4rem;
+    }
+
+    /* ───── CTA FINAL ───── */
+    #cta {
+      background: var(--brand);
+      text-align: center;
+    }
+
+    #cta .section-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .cta-card {
+      background: linear-gradient(135deg, var(--brand-mid), var(--brand-light));
+      border: 1px solid rgba(0, 194, 243, .25);
+      border-radius: 28px;
+      padding: 80px 60px;
+      max-width: 780px;
+      width: 100%;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-card::before {
+      content: '';
+      position: absolute;
+      top: -80px;
+      right: -80px;
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(0, 194, 243, .2) 0%, transparent 70%);
+    }
+
+    .cta-title {
+      font-size: clamp(1.8rem, 3vw, 2.6rem);
+      font-weight: 900;
+      line-height: 1.15;
+      letter-spacing: -1px;
+      margin-bottom: 16px;
+    }
+
+    .cta-sub {
+      color: var(--muted);
+      font-size: 1.05rem;
+      margin-bottom: 40px;
+      line-height: 1.6;
+    }
+
+    .cta-actions {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    /* ───── FOOTER ───── */
+    footer {
+      background: #00111a;
+      border-top: 1px solid var(--border);
+      padding: 40px 6%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .footer-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .footer-brand img {
+      height: 28px;
+    }
+
+    .footer-brand span {
+      font-size: .9rem;
+      font-weight: 600;
+    }
+
+    .footer-copy {
+      font-size: .8rem;
+      color: var(--muted);
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 24px;
+    }
+
+    .footer-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: .82rem;
+      transition: color .2s;
+    }
+
+    .footer-links a:hover {
+      color: var(--accent);
+    }
+
+    /* ───── RESPONSIVE ───── */
+    @media (max-width: 900px) {
+      .feature-row {
+        grid-template-columns: 1fr;
+      }
+
+      .feature-row.reverse {
+        direction: ltr;
+      }
+
+      .portal-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .nav-links {
+        display: none;
+      }
+    }
+
+    @media (max-width: 580px) {
+      .hero-stats {
+        gap: 28px;
+      }
+
+      .cta-card {
+        padding: 50px 28px;
+      }
+    }
+
+    /* ───── SCROLL ANIMATIONS ───── */
+    .animate-on-scroll {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity .7s ease, transform .7s ease;
+    }
+
+    .animate-on-scroll.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ══════════ NAV ══════════ -->
+  <nav id="navbar">
+    <a href="#hero" class="nav-logo">
+      <img src="logo.png" alt="Colaborar Logo" />
+    </a>
+    <ul class="nav-links">
+      <li><a href="#modules">Módulos</a></li>
+      <li><a href="#features">Funcionalidades</a></li>
+      <li><a href="#portal">Portal do Cliente</a></li>
+      <li><a href="#security">Segurança</a></li>
+      <li><a href="#tech">Tecnologia</a></li>
+    </ul>
+    <a href="#cta" class="nav-cta">Solicitar Demo</a>
+  </nav>
+
+  <!-- ══════════ HERO ══════════ -->
+  <section id="hero">
+    <div class="hero-glow"></div>
+    <div class="hero-badge">Plataforma Completa de Gestão</div>
+    <h1 class="hero-title">
+      O CRM que <span class="highlight">colabora</span><br />com o seu negócio
+    </h1>
+    <p class="hero-sub">
+      Gerencie clientes, contratos, ativos, chamados e agendamentos em uma única plataforma integrada — com total
+      rastreabilidade e controle em tempo real.
+    </p>
+    <div class="hero-actions">
+      <a href="#cta" class="btn-primary">Começar gratuitamente</a>
+      <a href="#modules" class="btn-ghost">Explorar módulos →</a>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-num">360°</div>
+        <div class="hero-stat-lbl">Visão do cliente</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">100%</div>
+        <div class="hero-stat-lbl">Rastreabilidade</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">SLA</div>
+        <div class="hero-stat-lbl">Controle automático</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">API</div>
+        <div class="hero-stat-lbl">Open & Documentada</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ MODULES ══════════ -->
+  <section id="modules">
+    <div class="section-inner">
+      <div class="animate-on-scroll">
+        <p class="section-badge">Módulos</p>
+        <h2 class="section-title">Tudo que você precisa,<br />em um só lugar</h2>
+        <p class="section-sub">Cada módulo foi projetado para cobrir uma área crítica da operação — do primeiro contato
+          até o encerramento do contrato.</p>
+      </div>
+      <div class="modules-grid">
+
+        <div class="module-card animate-on-scroll">
+          <div class="module-icon" style="background:rgba(0,194,243,.12)">👥</div>
+          <div class="module-title">Clientes</div>
+          <div class="module-desc">Cadastro completo de pessoas físicas e jurídicas com dados fiscais, endereço,
+            contatos vinculados e histórico operacional.</div>
+          <div class="module-tags">
+            <span class="module-tag">CNPJ / CPF</span>
+            <span class="module-tag">Soft Delete</span>
+            <span class="module-tag">Busca Inteligente</span>
+          </div>
+        </div>
+
+        <div class="module-card animate-on-scroll">
+          <div class="module-icon" style="background:rgba(240,192,96,.12)">📋</div>
+          <div class="module-title">Contratos</div>
+          <div class="module-desc">Registre contratos de locação com datas de vigência, valor mensal, SLA associado e
+            controle de status do ciclo de vida.</div>
+          <div class="module-tags">
+            <span class="module-tag">SLA Integrado</span>
+            <span class="module-tag">Valor Mensal</span>
+            <span class="module-tag">Status Dinâmico</span>
+          </div>
+        </div>
+
+        <div class="module-card animate-on-scroll">
+          <div class="module-icon" style="background:rgba(167,139,250,.12)">🔩</div>
+          <div class="module-title">Ativos</div>
+          <div class="module-desc">Gerencie o patrimônio técnico com número de série, status de uso, vínculo com
+            contratos e sincronização automática de estoque.</div>
+          <div class="module-tags">
+            <span class="module-tag">Nº de Série</span>
+            <span class="module-tag">Estoque Auto</span>
+            <span class="module-tag">Vínculo Contrato</span>
+          </div>
+        </div>
+
+        <div class="module-card animate-on-scroll">
+          <div class="module-icon" style="background:rgba(251,146,60,.12)">🎫</div>
+          <div class="module-title">Chamados</div>
+          <div class="module-desc">Abra, acompanhe e resolva chamados técnicos com ticket ID único, urgência, prazo SLA
+            calculado e histórico de resolução.</div>
+          <div class="module-tags">
+            <span class="module-tag">Ticket ID</span>
+            <span class="module-tag">Prazo SLA</span>
+            <span class="module-tag">Urgência</span>
+          </div>
+        </div>
+
+        <div class="module-card animate-on-scroll">
+          <div class="module-icon" style="background:rgba(74,222,128,.12)">📅</div>
+          <div class="module-title">Agendamentos</div>
+          <div class="module-desc">Programe retiradas e devoluções de ativos com alocação de técnicos, controle de
+            horários e rastreabilidade logística.</div>
+          <div class="module-tags">
+            <span class="module-tag">Retirada / Devolução</span>
+            <span class="module-tag">Técnicos</span>
+            <span class="module-tag">Logística</span>
+          </div>
+        </div>
+
+        <div class="module-card animate-on-scroll">
+          <div class="module-icon" style="background:rgba(239,68,68,.12)">👷</div>
+          <div class="module-title">Técnicos</div>
+          <div class="module-desc">Cadastre técnicos com especialidades, disponibilidade e vincule-os a chamados e
+            agendamentos automaticamente.</div>
+          <div class="module-tags">
+            <span class="module-tag">Especialidades</span>
+            <span class="module-tag">Disponibilidade</span>
+            <span class="module-tag">Alocação</span>
+          </div>
+        </div>
+
+        <div class="module-card animate-on-scroll">
+          <div class="module-icon" style="background:rgba(0,194,243,.12)">📦</div>
+          <div class="module-title">Estoque</div>
+          <div class="module-desc">Controle de produtos, saldo atual e movimentações de entrada e saída sincronizadas
+            com os ativos em campo.</div>
+          <div class="module-tags">
+            <span class="module-tag">Entradas / Saídas</span>
+            <span class="module-tag">Saldo Automático</span>
+            <span class="module-tag">Produtos</span>
+          </div>
+        </div>
+
+        <div class="module-card animate-on-scroll">
+          <div class="module-icon" style="background:rgba(240,192,96,.12)">🏪</div>
+          <div class="module-title">Fornecedores</div>
+          <div class="module-desc">Gerencie seus fornecedores estratégicos e vincule-os ao seu fluxo de compras e
+            reposição de estoque.</div>
+          <div class="module-tags">
+            <span class="module-tag">Cadastro Completo</span>
+            <span class="module-tag">Integrado ao Estoque</span>
+          </div>
+        </div>
+
+        <div class="module-card animate-on-scroll">
+          <div class="module-icon" style="background:rgba(167,139,250,.12)">📊</div>
+          <div class="module-title">Relatórios</div>
+          <div class="module-desc">Relatórios operacionais sobre chamados, SLA, ativos em campo, contratos ativos e
+            performance do time técnico.</div>
+          <div class="module-tags">
+            <span class="module-tag">SLA Report</span>
+            <span class="module-tag">Ativos em Campo</span>
+            <span class="module-tag">Performance</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ FEATURES ══════════ -->
+  <section id="features">
+    <div class="section-inner">
+      <div class="animate-on-scroll">
+        <p class="section-badge">Funcionalidades</p>
+        <h2 class="section-title">Detalhes que fazem<br />a diferença</h2>
+      </div>
+      <div class="features-list">
+
+        <!-- Feature 1: Contratos SLA -->
+        <div class="feature-row animate-on-scroll">
+          <div class="feature-visual">
+            <div class="fv-row">
+              <span class="fv-icon">📋</span>
+              <span class="fv-label">Contrato #1042</span>
+              <span class="fv-badge badge-green">Ativo</span>
+            </div>
+            <div class="fv-row">
+              <span class="fv-icon">⏱️</span>
+              <span class="fv-label">SLA Acordado</span>
+              <span class="fv-value">4 horas</span>
+            </div>
+            <div class="fv-row">
+              <span class="fv-icon">💰</span>
+              <span class="fv-label">Valor Mensal</span>
+              <span class="fv-value">R$ 2.850,00</span>
+            </div>
+            <div class="fv-row">
+              <span class="fv-icon">📆</span>
+              <span class="fv-label">Vigência</span>
+              <span class="fv-value">Jan 2025 – Jan 2026</span>
+            </div>
+            <div class="fv-row">
+              <span class="fv-icon">🔩</span>
+              <span class="fv-label">Ativos vinculados</span>
+              <span class="fv-value" style="color:var(--accent)">12 itens</span>
+            </div>
+          </div>
+          <div class="feature-content">
+            <span class="feature-tag">Contratos + SLA</span>
+            <h3 class="feature-title">Contratos com prazo, valor e SLA integrados</h3>
+            <p class="feature-desc">Cada contrato carrega consigo o seu nível de serviço acordado. O sistema calcula
+              automaticamente o prazo de atendimento a cada novo chamado aberto, garantindo que o time respeite os
+              compromissos.</p>
+            <ul class="feature-bullets">
+              <li>Múltiplos ativos vinculados ao mesmo contrato</li>
+              <li>Status automático: Ativo, Encerrado, Em andamento</li>
+              <li>Descrição e observações em campo texto livre</li>
+              <li>Prazo SLA herdado automaticamente nos chamados</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Feature 2: Chamados -->
+        <div class="feature-row reverse animate-on-scroll">
+          <div class="feature-visual">
+            <div class="fv-row">
+              <span class="fv-icon">🎫</span>
+              <span class="fv-label">TKT-20250409-001</span>
+              <span class="fv-badge badge-orange">Em Atendimento</span>
+            </div>
+            <div class="fv-row">
+              <span class="fv-icon">⚡</span>
+              <span class="fv-label">Urgência</span>
+              <span class="fv-value" style="color:#fb923c">Alta</span>
+            </div>
+            <div class="fv-row">
+              <span class="fv-icon">🕐</span>
+              <span class="fv-label">Prazo SLA</span>
+              <span class="fv-value" style="color:#f87171">2h restantes</span>
+            </div>
+            <div class="fv-row">
+              <span class="fv-icon">👷</span>
+              <span class="fv-label">Técnico</span>
+              <span class="fv-value">Carlos Mendes</span>
+            </div>
+            <div class="fv-row">
+              <span class="fv-icon">🔩</span>
+              <span class="fv-label">Ativo</span>
+              <span class="fv-value">Switch HP ProCurve</span>
+            </div>
+          </div>
+          <div class="feature-content">
+            <span class="feature-tag">Help Desk Integrado</span>
+            <h3 class="feature-title">Chamados técnicos com rastreabilidade total</h3>
+            <p class="feature-desc">Do registro ao encerramento, cada chamado possui ticket ID único, ativo vinculado,
+              técnico responsável, prazo calculado pelo SLA e histórico completo de resolução.</p>
+            <ul class="feature-bullets">
+              <li>Ticket ID automático para rastreamento externo</li>
+              <li>Urgência configurável: Normal, Alta, Crítica</li>
+              <li>Link com ativo, contrato e contato do cliente</li>
+              <li>Notificação por e-mail ao abrir chamado</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Feature 3: Agenda -->
+        <div class="feature-row animate-on-scroll">
+          <div class="feature-visual">
+            <div class="fv-row">
+              <span class="fv-icon">📅</span>
+              <span class="fv-label">10/04/2025 – 09h às 17h</span>
+              <span class="fv-badge badge-blue">Agendado</span>
+            </div>
+            <div class="fv-row">
+              <span class="fv-icon">🔩</span>
+              <span class="fv-label">Ativo Retirado</span>
+              <span class="fv-value">Câmera IP #003</span>
+            </div>
+            <div class="fv-row">
+              <span class="fv-icon">🔄</span>
+              <span class="fv-label">Devolução Prevista</span>
+              <span class="fv-value">15/04/2025</span>
+            </div>
+            <div class="fv-row">
+              <span class="fv-icon">👷</span>
+              <span class="fv-label">Técnicos</span>
+              <span class="fv-value">João, Maria</span>
+            </div>
+            <div class="fv-row">
+              <span class="fv-icon">📝</span>
+              <span class="fv-label">Quantidade</span>
+              <span class="fv-value">3 unidades</span>
+            </div>
+          </div>
+          <div class="feature-content">
+            <span class="feature-tag">Logística de Ativos</span>
+            <h3 class="feature-title">Agendamento com controle logístico completo</h3>
+            <p class="feature-desc">Registre e acompanhe cada movimentação de ativo — da retirada à devolução — com
+              alocação de técnicos, horários e vínculo direto com chamados e contratos.</p>
+            <ul class="feature-bullets">
+              <li>Retirada e devolução com datas e horários precisos</li>
+              <li>Múltiplos técnicos por agendamento</li>
+              <li>Quantidade de itens por movimentação</li>
+              <li>Observações e rastreio por número de série</li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ PORTAL ══════════ -->
+  <section id="portal">
+    <div class="section-inner">
+      <div class="portal-grid">
+        <div class="animate-on-scroll">
+          <p class="section-badge">Portal do Cliente</p>
+          <h2 class="section-title">Autoatendimento para<br />seus clientes</h2>
+          <p class="section-sub">Uma área exclusiva onde os contatos do seu cliente podem abrir chamados, acompanhar
+            tickets e visualizar contratos e ativos — sem precisar ligar.</p>
+          <div class="portal-features">
+            <div class="pf-item">
+              <div class="pf-icon">🎫</div>
+              <div>
+                <div class="pf-title">Abertura de chamados on-line</div>
+                <div class="pf-desc">O cliente abre tickets diretamente pelo portal, com descrição do problema e número
+                  de série do ativo afetado.</div>
+              </div>
+            </div>
+            <div class="pf-item">
+              <div class="pf-icon">🔍</div>
+              <div>
+                <div class="pf-title">Acompanhamento em tempo real</div>
+                <div class="pf-desc">Filtros por status, data, serial e assunto. Visibilidade total do prazo SLA
+                  restante.</div>
+              </div>
+            </div>
+            <div class="pf-item">
+              <div class="pf-icon">📋</div>
+              <div>
+                <div class="pf-title">Contratos e ativos visíveis</div>
+                <div class="pf-desc">O cliente visualiza seus contratos ativos e os equipamentos vinculados, com dados
+                  de status atualizados.</div>
+              </div>
+            </div>
+            <div class="pf-item">
+              <div class="pf-icon">🔐</div>
+              <div>
+                <div class="pf-title">Login seguro por contato</div>
+                <div class="pf-desc">Cada contato tem acesso exclusivo aos dados da sua empresa, sem cruzamento com
+                  outros clientes.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="portal-visual animate-on-scroll">
+          <div class="portal-header">
+            <div class="portal-dot r"></div>
+            <div class="portal-dot y"></div>
+            <div class="portal-dot g"></div>
+            <div class="portal-url">portal.colaborar.app/chamados</div>
+          </div>
+          <div class="portal-body">
+            <div class="ticket-card">
+              <div class="ticket-info">
+                <span class="ticket-id">TKT-20250409-003</span>
+                <span class="ticket-desc">Switch sem comunicação – rack 3</span>
+                <span class="ticket-meta">09/04/2025 · SN: HP-004512</span>
+              </div>
+              <span class="fv-badge badge-orange">Em Atend.</span>
+            </div>
+            <div class="ticket-card">
+              <div class="ticket-info">
+                <span class="ticket-id">TKT-20250407-011</span>
+                <span class="ticket-desc">Câmera IP sem imagem – câmera 02</span>
+                <span class="ticket-meta">07/04/2025 · SN: CAM-IP-002</span>
+              </div>
+              <span class="fv-badge badge-green">Resolvido</span>
+            </div>
+            <div class="ticket-card">
+              <div class="ticket-info">
+                <span class="ticket-id">TKT-20250402-008</span>
+                <span class="ticket-desc">Roteador reiniciando sozinho</span>
+                <span class="ticket-meta">02/04/2025 · SN: RT-8844X</span>
+              </div>
+              <span class="fv-badge badge-green">Resolvido</span>
+            </div>
+            <div class="ticket-card">
+              <div class="ticket-info">
+                <span class="ticket-id">TKT-20250401-001</span>
+                <span class="ticket-desc">Falha de energia no no-break</span>
+                <span class="ticket-meta">01/04/2025 · SN: NB-2021</span>
+              </div>
+              <span class="fv-badge badge-blue">Aberto</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ SECURITY ══════════ -->
+  <section id="security">
+    <div class="section-inner">
+      <div class="animate-on-scroll">
+        <p class="section-badge">Segurança e Controle</p>
+        <h2 class="section-title">Acesso granular por perfil</h2>
+        <p class="section-sub">Defina exatamente quem pode ver e fazer o quê — com permissões por módulo em cada perfil
+          de usuário.</p>
+      </div>
+      <div class="security-grid">
+        <div class="sec-card animate-on-scroll">
+          <div class="sec-icon">🔐</div>
+          <div class="sec-title">Autenticação por Credenciais</div>
+          <div class="sec-desc">Login com e-mail e senha por usuário. Sessões isoladas sem compartilhamento de dados
+            entre contas.</div>
+        </div>
+        <div class="sec-card animate-on-scroll">
+          <div class="sec-icon">👤</div>
+          <div class="sec-title">Perfis Personalizados</div>
+          <div class="sec-desc">Crie perfis como Técnico, Comercial, Administrador e defina quais menus cada grupo pode
+            acessar.</div>
+        </div>
+        <div class="sec-card animate-on-scroll">
+          <div class="sec-icon">🛡️</div>
+          <div class="sec-title">Permissões por Módulo</div>
+          <div class="sec-desc">Controle individual para Dashboard, Clientes, Chamados, Contratos, Ativos, Agenda,
+            Usuários, Estoque, Relatórios e Configurações.</div>
+        </div>
+        <div class="sec-card animate-on-scroll">
+          <div class="sec-icon">📝</div>
+          <div class="sec-title">Soft Delete Auditável</div>
+          <div class="sec-desc">Registros inativados nunca são apagados — preservam o histórico completo para auditoria
+            e rastreabilidade.</div>
+        </div>
+        <div class="sec-card animate-on-scroll">
+          <div class="sec-icon">🌐</div>
+          <div class="sec-title">Portal Isolado</div>
+          <div class="sec-desc">Contatos do cliente acessam apenas os dados da própria empresa, com login e sessão
+            totalmente independentes.</div>
+        </div>
+        <div class="sec-card animate-on-scroll">
+          <div class="sec-icon">🔄</div>
+          <div class="sec-title">Configuração via Interface</div>
+          <div class="sec-desc">Upload de logo e configuração do banco de dados realizada diretamente pela interface
+            administrativa, sem editar arquivos.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ TECH ══════════ -->
+  <section id="tech">
+    <div class="section-inner">
+      <div class="animate-on-scroll">
+        <p class="section-badge">Stack Tecnológico</p>
+        <h2 class="section-title">Construído com tecnologias<br />sólidas e modernas</h2>
+        <p class="section-sub">Infraestrutura robusta para rodar on-premise ou em VPS dedicada, com API documentada e
+          banco de dados confiável.</p>
+      </div>
+      <div class="tech-badges">
+        <div class="tech-badge animate-on-scroll"><span>🟢</span> Node.js</div>
+        <div class="tech-badge animate-on-scroll"><span>🚂</span> Express</div>
+        <div class="tech-badge animate-on-scroll"><span>🔥</span> Firebird 5.0</div>
+        <div class="tech-badge animate-on-scroll"><span>📄</span> HTML5 + CSS3</div>
+        <div class="tech-badge animate-on-scroll"><span>🟨</span> JavaScript ES2022</div>
+        <div class="tech-badge animate-on-scroll"><span>📬</span> Nodemailer</div>
+        <div class="tech-badge animate-on-scroll"><span>📖</span> Swagger / OpenAPI</div>
+        <div class="tech-badge animate-on-scroll"><span>♾️</span> PM2 (Deploy)</div>
+        <div class="tech-badge animate-on-scroll"><span>🌐</span> Nginx</div>
+        <div class="tech-badge animate-on-scroll"><span>🔒</span> HTTPS / SSL</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ CTA ══════════ -->
+  <section id="cta">
+    <div class="section-inner">
+      <div class="cta-card animate-on-scroll">
+        <p class="section-badge" style="margin-bottom:18px">Pronto para começar?</p>
+        <h2 class="cta-title">Leve o Colaborar para<br />a sua operação hoje</h2>
+        <p class="cta-sub">Implantação simples, sem contratos longos. Sua equipe operando em horas.</p>
+        <div class="cta-actions">
+          <a href="mailto:conectsolutions@hotmail.com" class="btn-primary">Falar com a equipe</a>
+          <a href="#modules" class="btn-ghost">Ver todos os módulos</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ FOOTER ══════════ -->
+  <footer>
+    <div class="footer-brand">
+      <img src="logo.png" alt="Colaborar" />
+      <span>Colaborar CRM</span>
+    </div>
+    <span class="footer-copy">© 2025 Colaborar. Todos os direitos reservados.</span>
+    <div class="footer-links">
+      <a href="#modules">Módulos</a>
+      <a href="#features">Funcionalidades</a>
+      <a href="#portal">Portal</a>
+      <a href="#cta">Contato</a>
+    </div>
+  </footer>
+
+  <script>
+    // Nav scroll shadow
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 40);
+    });
+
+    // Scroll animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry, i) => {
+        if (entry.isIntersecting) {
+          setTimeout(() => {
+            entry.target.classList.add('visible');
+          }, 80 * (entry.target.dataset.delay || 0));
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12 });
+
+    document.querySelectorAll('.animate-on-scroll').forEach((el, i) => {
+      el.dataset.delay = i % 4;
+      observer.observe(el);
+    });
+  </script>
+</body>
+
+</html>
