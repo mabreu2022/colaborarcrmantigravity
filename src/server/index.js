@@ -1328,7 +1328,7 @@ app.get("/api/portal/chamados", async (req, res) => {
         }
 
         query += ` ORDER BY CH.ID_CHAMADO DESC`;
-        
+
         const result = await db.query(query, params);
 
         const parsed = await Promise.all(result.map(async row => {
@@ -1391,7 +1391,7 @@ app.get("/api/portal/chamados/:id", async (req, res) => {
             const desc = await processBlob(row.DESCRICAO);
             const resolucao = await processBlob(row.RESOLUCAO);
             const nomeAtivo = await processBlob(row.NOME_ATIVO);
-            
+
             let prazoSla = row.DATA_PRAZO_SLA;
             if (!prazoSla && row.SLA_NOME) {
                 const hoursMatch = row.SLA_NOME.match(/\d+/);
@@ -2910,7 +2910,7 @@ app.post('/api/chamados', async (req, res) => {
         );
 
         res.json({ success: true, id: result.ID_CHAMADO, ticketId });
-        
+
         // Disparar e-mail de notificação
         sendTicketEmail(result.ID_CHAMADO);
     } catch (error) { res.status(500).json({ error: error.message }); }
@@ -3085,12 +3085,12 @@ async function sendTicketEmail(id_chamado) {
         }
 
         const data = result[0];
-        
+
         // Configuração do Transportador SMTP (GMail)
         const transporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST || 'smtp.gmail.com',
             port: parseInt(process.env.SMTP_PORT) || 587,
-            secure: process.env.SMTP_PORT == 465, 
+            secure: process.env.SMTP_PORT == 465,
             auth: {
                 user: process.env.SMTP_USER,
                 pass: process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/"/g, '') : null
