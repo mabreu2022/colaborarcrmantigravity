@@ -130,19 +130,27 @@ class PortalManager {
 
     async loadNewTicketForm() {
         const contractSelect = document.getElementById('ticketContract');
+        console.log(`[Portal] Loading new ticket form. User Client ID: ${this.user.ID_CLIENTE}`);
         
         try {
             const res = await fetch(`../../api/portal/contratos?clientId=${this.user.ID_CLIENTE}`);
             const contracts = await res.json();
+            console.log(`[Portal] Contracts received:`, contracts);
 
             contractSelect.innerHTML = '<option value="">Selecione o contrato...</option>';
-            contracts.forEach(c => {
-                contractSelect.innerHTML += `<option value="${c.ID_CONTRATO}">${c.NOME_CONTRATO} (#${c.NUMERO_CONTRATO})</option>`;
-            });
+            
+            if (!contracts || contracts.length === 0) {
+                contractSelect.innerHTML = '<option value="">Nenhum contrato ativo encontrado</option>';
+            } else {
+                contracts.forEach(c => {
+                    contractSelect.innerHTML += `<option value="${c.ID_CONTRATO}">${c.NOME_CONTRATO} (#${c.NUMERO_CONTRATO})</option>`;
+                });
+            }
 
             document.getElementById('newTicketForm').onsubmit = (e) => this.handleNewTicket(e);
         } catch (e) {
-            console.error('Error loading contracts', e);
+            console.error('[Portal] Erro ao carregar contratos:', e);
+            contractSelect.innerHTML = '<option value="">Erro ao carregar contratos</option>';
         }
     }
 

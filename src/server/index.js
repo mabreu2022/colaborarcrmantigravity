@@ -394,6 +394,21 @@ app.post('/api/contatos', async (req, res) => {
 
     const { ID_CLIENTE, NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO, SENHA } = req.body;
     try {
+        if (EMAIL_CONTATO && EMAIL_CONTATO.trim() !== '') {
+            const checkQuery = `
+                SELECT C.ID_CONTATO 
+                FROM CONTATOS C
+                JOIN CLIENTES CL ON C.ID_CLIENTE = CL.ID_CLIENTE
+                WHERE UPPER(TRIM(C.EMAIL_CONTATO)) = UPPER(?) 
+                AND (C.ATIVO = 'S' OR C.ATIVO = 'T') 
+                AND CL.ATIVO = 'S'
+            `;
+            const existing = await db.query(checkQuery, [EMAIL_CONTATO.trim()]);
+            if (existing.length > 0) {
+                return res.status(400).json({ error: 'Este e-mail já está em uso por outro contato ativo.' });
+            }
+        }
+
         const query = `
             INSERT INTO CONTATOS (ID_CLIENTE, NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO, ATIVO, DATA_CADASTRO, SENHA)
             VALUES (?, ?, ?, ?, ?, ?, ?, 'S', CURRENT_DATE, ?)
@@ -434,6 +449,22 @@ app.put('/api/contatos/:id', async (req, res) => {
     const { id } = req.params;
     const { NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO, SENHA } = req.body;
     try {
+        if (EMAIL_CONTATO && EMAIL_CONTATO.trim() !== '') {
+            const checkQuery = `
+                SELECT C.ID_CONTATO 
+                FROM CONTATOS C
+                JOIN CLIENTES CL ON C.ID_CLIENTE = CL.ID_CLIENTE
+                WHERE UPPER(TRIM(C.EMAIL_CONTATO)) = UPPER(?) 
+                AND C.ID_CONTATO != ?
+                AND (C.ATIVO = 'S' OR C.ATIVO = 'T') 
+                AND CL.ATIVO = 'S'
+            `;
+            const existing = await db.query(checkQuery, [EMAIL_CONTATO.trim(), id]);
+            if (existing.length > 0) {
+                return res.status(400).json({ error: 'Este e-mail já está em uso por outro contato ativo.' });
+            }
+        }
+
         const query = `
             UPDATE CONTATOS 
             SET NOME_CONTATO=?, TELEFONE_CONTATO=?, EMAIL_CONTATO=?, CARGO=?, OBSERVACAO=?, TIPO_CONTATO=?, SENHA=?
@@ -1207,9 +1238,9 @@ app.post("/api/portal/login", async (req, res) => {
             SELECT C.*, CL.NOME_RAZAO as CLIENTE_NOME
             FROM CONTATOS C
             JOIN CLIENTES CL ON C.ID_CLIENTE = CL.ID_CLIENTE
-            WHERE C.EMAIL_CONTATO = ? AND C.SENHA = ? AND C.ATIVO = 'S'
+            WHERE UPPER(TRIM(C.EMAIL_CONTATO)) = UPPER(?) AND C.SENHA = ? AND (C.ATIVO = 'S' OR C.ATIVO = 'T') AND CL.ATIVO = 'S'
         `;
-        const result = await db.query(query, [email, password]);
+        const result = await db.query(query, [email ? email.trim() : '', password]);
 
         if (result.length > 0) {
             const user = result[0];
@@ -1396,14 +1427,17 @@ app.get("/api/portal/chamados/:id", async (req, res) => {
 // Portal - Get Customer Active Contracts
 app.get("/api/portal/contratos", async (req, res) => {
     const { clientId } = req.query;
+    const parsedClientId = clientId ? parseInt(clientId, 10) : null;
+    console.log(`[Portal] Fetching contracts for clientId: ${parsedClientId}`);
     try {
         const query = `
             SELECT C.*, S.NOME as STATUS_NOME, C.DESCRICAO as NOME_CONTRATO, C.ID_CONTRATO as NUMERO_CONTRATO 
             FROM CONTRATOS C
             LEFT JOIN STATUS_CONTRATO S ON C.ID_STATUS = S.ID_STATUS
-            WHERE C.ID_CLIENTE = ? AND (S.NOME = 'Ativo' OR C.ID_STATUS = 1)
+            WHERE C.ID_CLIENTE = ? AND (UPPER(TRIM(S.NOME)) = 'ATIVO' OR C.ID_STATUS = 1 OR C.ID_STATUS IS NULL)
         `;
-        const result = await db.query(query, [clientId]);
+        const result = await db.query(query, [parsedClientId]);
+        console.log(`[Portal] Found ${result.length} contracts for clientId: ${clientId}`);
 
         const parsed = await Promise.all(result.map(async row => ({
             ...row,
