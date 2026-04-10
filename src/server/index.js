@@ -902,9 +902,12 @@ app.post('/api/ativos', async (req, res) => {
             await db.query('INSERT INTO ATIVOS_CONTRATOS (ID_ATIVO, ID_CONTRATO) VALUES (?, ?)', [idAtivo, ID_CONTRATO]);
         }
 
-        // Se já nascer em estoque (Status 2), sincroniza
+        // Se já nascer em estoque (Status 2), sincroniza a entrada
         if (ID_STATUS == 2 && ID_PRODUTO) {
             await syncAssetToInventory(result.ID_ATIVO, 2);
+        } else if (ID_STATUS != 2 && ID_PRODUTO) {
+            // Se nascer locado/em uso e tiver produto vinculado, tira 1 do estoque
+            await checkoutAssetFromInventory(result.ID_ATIVO);
         }
 
         res.json({ success: true, id: result.ID_ATIVO });
@@ -955,6 +958,9 @@ app.put('/api/ativos/:id', async (req, res) => {
         // 4. If status changed to "Estoque" (2) and it wasn't before
         if (ID_STATUS == 2 && currentAsset && currentAsset.ID_STATUS != 2) {
             await syncAssetToInventory(id, 2);
+        } else if (ID_STATUS != 2 && currentAsset && currentAsset.ID_STATUS == 2) {
+            // Saiu do estoque (ex: mudou para locado), subtrai o saldo
+            await checkoutAssetFromInventory(id);
         }
 
         res.json({ success: true });
@@ -990,6 +996,30 @@ async function syncAssetToInventory(idAtivo, statusId) {
 
     } catch (e) {
         console.error('Erro ao sincronizar ativo com estoque:', e);
+        throw e;
+    }
+}
+
+// Helper to deduct Asset entry from Inventory balance (Liberacao/Baixa)
+async function checkoutAssetFromInventory(idAtivo) {
+    try {
+        const asset = (await db.query('SELECT ID_PRODUTO, DESCRICAO FROM ATIVOS WHERE ID_ATIVO = ?', [idAtivo]))[0];
+        if (!asset || !asset.ID_PRODUTO) return;
+
+        console.log(`Debitando Ativo ${idAtivo} do Estoque do Produto ${asset.ID_PRODUTO}`);
+
+        // 1. Decrementar Saldo Atual
+        await db.query('UPDATE PRODUTOS SET SALDO_ATUAL = SALDO_ATUAL - 1 WHERE ID_PRODUTO = ?', [asset.ID_PRODUTO]);
+
+        // 2. Registrar Movimentação de Saída
+        const movQuery = `
+            INSERT INTO MOVIMENTACOES_ESTOQUE (ID_PRODUTO, TIPO, QUANTIDADE, MOTIVO, DATA_MOV)
+            VALUES (?, 'S', 1, ?, CURRENT_TIMESTAMP)
+        `;
+        await db.query(movQuery, [asset.ID_PRODUTO, `SAÍDA PARA ATIVO: ${asset.DESCRICAO} (ID: ${idAtivo})`]);
+
+    } catch (e) {
+        console.error('Erro ao debitar ativo do estoque:', e);
         throw e;
     }
 }
@@ -2477,17 +2507,27 @@ app.get('/api/produtos', async (req, res) => {
  *         description: Product created successfully.
  */
 app.post('/api/produtos', async (req, res) => {
-    const { NOME, DESCRICAO, UNIDADE, PRECO_VENDA, DATA_COMPRA, NUMERO_NF, ID_FORNECEDOR } = req.body;
+    const { NOME, DESCRICAO, UNIDADE, SALDO_INICIAL, PRECO_VENDA, DATA_COMPRA, NUMERO_NF, ID_FORNECEDOR } = req.body;
     try {
+        const saldoFormatado = parseFloat(SALDO_INICIAL) || 0;
         const query = `
             INSERT INTO PRODUTOS (NOME, DESCRICAO, UNIDADE, PRECO_VENDA, SALDO_ATUAL, ATIVO, DATA_COMPRA, NUMERO_NF, ID_FORNECEDOR)
-            VALUES (?, ?, ?, ?, 0, 'S', ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, 'S', ?, ?, ?)
             RETURNING ID_PRODUTO
         `;
         const result = await db.query(query, [
             sanitize(NOME), sanitize(DESCRICAO), sanitize(UNIDADE) || 'UN',
-            PRECO_VENDA || 0, DATA_COMPRA || null, sanitize(NUMERO_NF) || null, ID_FORNECEDOR || null
+            PRECO_VENDA || 0, saldoFormatado, DATA_COMPRA || null, sanitize(NUMERO_NF) || null, ID_FORNECEDOR || null
         ]);
+
+        if (saldoFormatado > 0) {
+            const movQuery = `
+                INSERT INTO MOVIMENTACOES_ESTOQUE (ID_PRODUTO, TIPO, QUANTIDADE, MOTIVO, DATA_MOV)
+                VALUES (?, 'E', ?, 'SALDO INICIAL', CURRENT_TIMESTAMP)
+            `;
+            await db.query(movQuery, [result.ID_PRODUTO, saldoFormatado]);
+        }
+
         res.json({ success: true, id: result.ID_PRODUTO });
     } catch (error) {
         console.error('Error in POST /api/produtos:', error);

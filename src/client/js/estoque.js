@@ -185,10 +185,15 @@ class EstoqueManager {
             document.getElementById('produtoNome').value = p.NOME;
             document.getElementById('produtoDesc').value = p.DESCRICAO || '';
             document.getElementById('produtoUnidade').value = p.UNIDADE || 'UN';
+            document.getElementById('produtoQtde').value = p.SALDO_ATUAL || 0;
+            document.getElementById('produtoQtde').disabled = true; // Não altera saldo por aqui
             document.getElementById('produtoPreco').value = p.PRECO_VENDA || 0;
             document.getElementById('produtoDataCompra').value = p.DATA_COMPRA ? p.DATA_COMPRA.split('T')[0] : '';
             document.getElementById('produtoNF').value = p.NUMERO_NF || '';
             document.getElementById('produtoFornecedor').value = p.ID_FORNECEDOR || '';
+        } else {
+            document.getElementById('produtoQtde').value = 0;
+            document.getElementById('produtoQtde').disabled = false;
         }
 
         modal.classList.add('active');
@@ -212,6 +217,7 @@ class EstoqueManager {
             NOME: document.getElementById('produtoNome').value,
             DESCRICAO: document.getElementById('produtoDesc').value,
             UNIDADE: document.getElementById('produtoUnidade').value,
+            SALDO_INICIAL: parseFloat(document.getElementById('produtoQtde').value) || 0,
             PRECO_VENDA: parseFloat(document.getElementById('produtoPreco').value) || 0,
             DATA_COMPRA: document.getElementById('produtoDataCompra').value || null,
             NUMERO_NF: document.getElementById('produtoNF').value || null,

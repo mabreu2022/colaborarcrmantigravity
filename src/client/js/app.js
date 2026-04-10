@@ -241,6 +241,13 @@ class AppManager {
 
       if (document.getElementById("assetProduct")) {
         document.getElementById("assetProduct").value = asset.ID_PRODUTO || "";
+        if (asset.ID_PRODUTO) {
+            document.getElementById("assetDesc").readOnly = true;
+            document.getElementById("assetDesc").style.backgroundColor = 'rgba(255,255,255,0.05)';
+        } else {
+            document.getElementById("assetDesc").readOnly = false;
+            document.getElementById("assetDesc").style.backgroundColor = '';
+        }
       }
 
       const btnHist = document.getElementById("btnVerHistoricoModal");
@@ -251,6 +258,10 @@ class AppManager {
       title.textContent = "Novo Ativo";
       this.initialAssetStatus = null;
       this.initialAssetContract = null;
+      
+      const assetDesc = document.getElementById("assetDesc");
+      assetDesc.readOnly = false;
+      assetDesc.style.backgroundColor = '';
 
       const btnHist = document.getElementById("btnVerHistoricoModal");
       if (btnHist) {
@@ -340,6 +351,23 @@ class AppManager {
       document.getElementById("assetContract").value = "";
       // Disparar o onchange para atualizar os contratos (limpar a lista)
       this.updateAssetContracts();
+    }
+  }
+
+  onAssetProductChange() {
+    const productSelect = document.getElementById("assetProduct");
+    const descInput = document.getElementById("assetDesc");
+    
+    if (productSelect.value) {
+      // Pega o texto da opção selecionada e tira a unidade do final (ex: " (UN)") se houver
+      let text = productSelect.options[productSelect.selectedIndex].text;
+      descInput.value = text.replace(/\s\([^)]+\)$/, '');
+      descInput.readOnly = true;
+      descInput.style.backgroundColor = 'rgba(255,255,255,0.05)';
+    } else {
+      descInput.value = "";
+      descInput.readOnly = false;
+      descInput.style.backgroundColor = '';
     }
   }
 
