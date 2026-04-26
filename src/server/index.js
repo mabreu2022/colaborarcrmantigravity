@@ -6,6 +6,11 @@ require('dotenv').config();
 const fs = require('fs'); // Added for .env writing
 const nodemailer = require(path.join(__dirname, 'node_modules', 'nodemailer'));
 
+// ── LGPD: Auditoria de Acessos e Anonimização ───────────────────────────────
+const { auditarAcessoPII, auditarRotasSensiveis } = require('./lgpd/audit_middleware');
+const { anonimizarClienteViaSP } = require('./lgpd/anonymization');
+// ─────────────────────────────────────────────────────────────────────────────
+
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -189,6 +194,12 @@ app.get('/api/health', async (req, res) => {
  *               items:
  *                 $ref: '#/components/schemas/Cliente'
  */
+// LGPD — Auditoria automática de todos os acessos às rotas de CLIENTES e CONTATOS
+// O middleware registra o acesso na AUDITORIA_ACESSOS APÓS a resposta ser enviada
+// (não bloqueia a requisição nem impacta a performance)
+app.use('/api/clientes', auditarRotasSensiveis('CLIENTES'));
+app.use('/api/contatos', auditarRotasSensiveis('CONTATOS'));
+
 app.get('/api/clientes', async (req, res) => {
 
     try {
@@ -324,6 +335,52 @@ app.delete('/api/clientes/:id', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * LGPD — Soft Delete com Anonimização Técnica
+ * Chama a SP_LGPD_ANONIMIZAR_CLIENTE do Firebird.
+ * Substitui Nome, CPF, Email e Telefone por pseudônimos irreversíveis.
+ * Preserva ID_CLIENTE, chaves estrangeiras e histórico financeiro.
+ *
+ * POST /api/lgpd/clientes/:id/anonimizar
+ * Body (opcional): { "solicitante": "admin@empresa.com" }
+ */
+app.post('/api/lgpd/clientes/:id/anonimizar', auditarAcessoPII('LGPD_ANONIMIZACAO', 'CLIENTES'), async (req, res) => {
+    const { id } = req.params;
+    const solicitante = req.body?.solicitante || req.headers['x-usuario-login'] || 'ADMIN_CRM';
+
+    try {
+        const idInt = parseInt(id, 10);
+        if (isNaN(idInt) || idInt <= 0) {
+            return res.status(400).json({ erro: 'ID inválido. Deve ser um número inteiro positivo.' });
+        }
+
+        console.log(`[LGPD] Anonimização solicitada | ID_CLIENTE=${idInt} | Solicitante=${solicitante}`);
+
+        const resultado = await anonimizarClienteViaSP(idInt, solicitante);
+
+        if (resultado.status === 'ERRO') {
+            return res.status(500).json({ erro: resultado.mensagem });
+        }
+
+        if (resultado.status === 'SKIP') {
+            return res.status(200).json({
+                aviso: 'Cliente já foi anonimizado anteriormente.',
+                status: 'SKIP'
+            });
+        }
+
+        console.log(`[LGPD] ✅ Anonimização concluída | ID_CLIENTE=${idInt}`);
+        return res.status(200).json({
+            mensagem: `Cliente ${idInt} anonimizado com sucesso conforme LGPD Art. 18.`,
+            status: 'OK'
+        });
+
+    } catch (error) {
+        console.error(`[LGPD] ❌ Erro na anonimização | ID_CLIENTE=${id}:`, error);
+        res.status(500).json({ erro: 'Falha ao processar solicitação LGPD: ' + error.message });
     }
 });
 

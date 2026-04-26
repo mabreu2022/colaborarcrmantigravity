@@ -1,0 +1,7 @@
+# DPO Agentic — Dependências Python
+# Instalar com: pip install -r requirements.txt
+
+fdb>=2.0.2           # Driver Firebird 5.0 para Python
+requests>=2.31.0     # HTTP client com suporte a retry e timeout
+python-dotenv>=1.0.0 # Carregamento de variáveis de ambiente via .env
+urllib3>=2.0.0       # Dependency de requests — retry strategy

@@ -1,0 +1,152 @@
+-- ============================================================
+-- PILAR 4: Gestão de Consentimento LGPD — DDL Firebird 5.0
+-- Arquivo: 05_consentimento_lgpd_ddl.sql
+-- ============================================================
+-- Adiciona campos de consentimento LGPD nas tabelas LEADS e CLIENTES.
+-- Referência legal: LGPD Art. 7º (bases legais), Art. 8º (consentimento),
+--                   Art. 9º (transparência), Art. 18º (direitos do titular).
+-- ============================================================
+
+-- ============================================================
+-- TABELA LEADS: Campos de Consentimento
+-- ============================================================
+
+-- Origem do dado (Base Legal — LGPD Art. 7º)
+-- Ex: FORMULARIO_WEB, INDICACAO, IMPORTACAO, CONTATO_DIRETO
+ALTER TABLE LEADS ADD ORIGEM_DADO VARCHAR(50);
+
+-- Data e hora em que o consentimento foi coletado
+ALTER TABLE LEADS ADD DATA_CONSENTIMENTO TIMESTAMP;
+
+-- Opt-In para comunicações de marketing (1=Sim, 0=Não)
+ALTER TABLE LEADS ADD OPT_IN_COMUNICACAO SMALLINT DEFAULT 0 NOT NULL;
+
+-- Opt-In específico para WhatsApp/SMS
+ALTER TABLE LEADS ADD OPT_IN_WHATSAPP SMALLINT DEFAULT 0 NOT NULL;
+
+-- Versão da Política de Privacidade aceita pelo titular
+ALTER TABLE LEADS ADD VERSAO_POLITICA_PRIVACIDADE VARCHAR(20);
+
+-- IP de onde o consentimento foi coletado (evidência legal)
+ALTER TABLE LEADS ADD IP_CONSENTIMENTO VARCHAR(45);
+
+-- URL da página onde o consentimento foi coletado
+ALTER TABLE LEADS ADD URL_ORIGEM_CONSENTIMENTO VARCHAR(500);
+
+-- Base legal da coleta (LGPD Art. 7º — incisos I a X)
+-- Ex: CONSENTIMENTO, CONTRATO, INTERESSE_LEGITIMO, OBRIGACAO_LEGAL
+ALTER TABLE LEADS ADD BASE_LEGAL_COLETA VARCHAR(50);
+
+-- Data de expiração do consentimento (renovação periódica recomendada)
+ALTER TABLE LEADS ADD DATA_EXPIRACAO_CONSENTIMENTO TIMESTAMP;
+
+-- Revogação do consentimento (LGPD Art. 18, inciso IX)
+ALTER TABLE LEADS ADD CONSENTIMENTO_REVOGADO SMALLINT DEFAULT 0 NOT NULL;
+ALTER TABLE LEADS ADD DATA_REVOGACAO_CONSENTIMENTO TIMESTAMP;
+ALTER TABLE LEADS ADD MOTIVO_REVOGACAO VARCHAR(255);
+
+-- ============================================================
+-- TABELA CLIENTES: Campos de Consentimento
+-- ============================================================
+ALTER TABLE CLIENTES ADD ORIGEM_DADO VARCHAR(50);
+ALTER TABLE CLIENTES ADD DATA_CONSENTIMENTO TIMESTAMP;
+ALTER TABLE CLIENTES ADD OPT_IN_COMUNICACAO SMALLINT DEFAULT 0 NOT NULL;
+ALTER TABLE CLIENTES ADD OPT_IN_WHATSAPP SMALLINT DEFAULT 0 NOT NULL;
+ALTER TABLE CLIENTES ADD VERSAO_POLITICA_PRIVACIDADE VARCHAR(20);
+ALTER TABLE CLIENTES ADD IP_CONSENTIMENTO VARCHAR(45);
+ALTER TABLE CLIENTES ADD BASE_LEGAL_COLETA VARCHAR(50);
+ALTER TABLE CLIENTES ADD DATA_EXPIRACAO_CONSENTIMENTO TIMESTAMP;
+ALTER TABLE CLIENTES ADD CONSENTIMENTO_REVOGADO SMALLINT DEFAULT 0 NOT NULL;
+ALTER TABLE CLIENTES ADD DATA_REVOGACAO_CONSENTIMENTO TIMESTAMP;
+ALTER TABLE CLIENTES ADD MOTIVO_REVOGACAO VARCHAR(255);
+
+COMMIT;
+
+-- ============================================================
+-- TABELA AUXILIAR: Histórico de Consentimentos
+-- Mantém o histórico completo de todas as versões de consentimento.
+-- Essencial para evidência legal em caso de questionamento.
+-- ============================================================
+CREATE TABLE HISTORICO_CONSENTIMENTOS (
+    ID                  INTEGER       NOT NULL,
+    TITULAR_TIPO        VARCHAR(20)   NOT NULL,   -- 'CLIENTE' ou 'LEAD'
+    TITULAR_ID          INTEGER       NOT NULL,
+    ACAO                VARCHAR(30)   NOT NULL,   -- 'CONSENTIMENTO', 'REVOGACAO', 'RENOVACAO'
+    OPT_IN_COMUNICACAO  SMALLINT      DEFAULT 0,
+    OPT_IN_WHATSAPP     SMALLINT      DEFAULT 0,
+    BASE_LEGAL          VARCHAR(50),
+    VERSAO_POLITICA     VARCHAR(20),
+    IP_ORIGEM           VARCHAR(45),
+    URL_ORIGEM          VARCHAR(500),
+    TIMESTAMP_EVENTO    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    OBSERVACOES         VARCHAR(500),
+    CONSTRAINT PK_HISTORICO_CONSENT PRIMARY KEY (ID)
+);
+
+CREATE GENERATOR GEN_HISTORICO_CONSENT_ID;
+ALTER SEQUENCE GEN_HISTORICO_CONSENT_ID START WITH 1 INCREMENT BY 1;
+
+-- Índices para relatório de consentimentos
+CREATE INDEX IDX_HCONSENT_TITULAR ON HISTORICO_CONSENTIMENTOS (TITULAR_TIPO, TITULAR_ID);
+CREATE INDEX IDX_HCONSENT_DATA    ON HISTORICO_CONSENTIMENTOS (TIMESTAMP_EVENTO);
+
+SET TERM ^ ;
+
+CREATE OR ALTER TRIGGER TRG_HISTORICO_CONSENT_BI
+FOR HISTORICO_CONSENTIMENTOS
+ACTIVE BEFORE INSERT
+POSITION 0
+AS BEGIN
+    IF (NEW.ID IS NULL OR NEW.ID = 0) THEN
+        NEW.ID = NEXT VALUE FOR GEN_HISTORICO_CONSENT_ID;
+    NEW.TIMESTAMP_EVENTO = CURRENT_TIMESTAMP;
+END^
+
+SET TERM ; ^
+
+COMMIT;
+
+-- ============================================================
+-- TABELA: Registro de Solicitações de Direitos LGPD (Art. 18)
+-- Rastreia solicitações: acesso, portabilidade, eliminação, correção
+-- ============================================================
+CREATE TABLE LGPD_SOLICITACOES (
+    ID                  INTEGER       NOT NULL,
+    TITULAR_TIPO        VARCHAR(20)   NOT NULL,   -- 'CLIENTE' ou 'LEAD'
+    TITULAR_ID          INTEGER       NOT NULL,
+    TIPO_SOLICITACAO    VARCHAR(50)   NOT NULL,   -- 'ACESSO', 'PORTABILIDADE', 'ELIMINACAO', 'CORRECAO', 'REVOGACAO'
+    STATUS              VARCHAR(30)   DEFAULT 'PENDENTE' NOT NULL, -- 'PENDENTE', 'EM_ANALISE', 'CONCLUIDO', 'RECUSADO'
+    DATA_SOLICITACAO    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    DATA_PRAZO          TIMESTAMP,               -- Prazo legal: 15 dias úteis (LGPD Art. 18 §3)
+    DATA_CONCLUSAO      TIMESTAMP,
+    RESPONSAVEL_ID      INTEGER,                 -- Usuário DPO/Admin que tratou
+    CANAL_SOLICITACAO   VARCHAR(50),             -- 'EMAIL', 'PORTAL', 'WHATSAPP', 'PRESENCIAL'
+    OBSERVACOES         BLOB SUB_TYPE TEXT,
+    CONSTRAINT PK_LGPD_SOLICITACOES PRIMARY KEY (ID)
+);
+
+CREATE GENERATOR GEN_LGPD_SOLICIT_ID;
+ALTER SEQUENCE GEN_LGPD_SOLICIT_ID START WITH 1 INCREMENT BY 1;
+
+CREATE INDEX IDX_LGPD_SOLICIT_TITULAR ON LGPD_SOLICITACOES (TITULAR_TIPO, TITULAR_ID);
+CREATE INDEX IDX_LGPD_SOLICIT_STATUS  ON LGPD_SOLICITACOES (STATUS);
+CREATE INDEX IDX_LGPD_SOLICIT_DATA    ON LGPD_SOLICITACOES (DATA_SOLICITACAO);
+
+SET TERM ^ ;
+
+CREATE OR ALTER TRIGGER TRG_LGPD_SOLICIT_BI
+FOR LGPD_SOLICITACOES
+ACTIVE BEFORE INSERT
+POSITION 0
+AS BEGIN
+    IF (NEW.ID IS NULL OR NEW.ID = 0) THEN
+        NEW.ID = NEXT VALUE FOR GEN_LGPD_SOLICIT_ID;
+    NEW.DATA_SOLICITACAO = CURRENT_TIMESTAMP;
+    -- Prazo de 15 dias úteis = ~21 dias corridos (estimativa conservadora)
+    IF (NEW.DATA_PRAZO IS NULL) THEN
+        NEW.DATA_PRAZO = DATEADD(21 DAY TO CURRENT_TIMESTAMP);
+END^
+
+SET TERM ; ^
+
+COMMIT;
