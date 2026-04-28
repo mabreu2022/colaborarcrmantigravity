@@ -32,7 +32,7 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://code.jquery.com", "https://unpkg.com"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://code.jquery.com", "https://unpkg.com"],
             scriptSrcAttr: ["'unsafe-inline'"], // Permite onclick="..." no HTML
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://unpkg.com"],
             imgSrc: ["'self'", "data:", "blob:", "https:"],
@@ -62,15 +62,20 @@ app.use((req, res, next) => {
 
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+// Configurar CORS para permitir apenas o domínio oficial e o localhost
+const corsOptions = {
+    origin: ['https://conectsolutionsti.dev.br', 'http://127.0.0.1:3000', 'http://localhost:3000'],
+    optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Swagger Documentation
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-app.get('/api-docs.json', (req, res) => {
+app.use('/api-docs', verifyToken, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.get('/api-docs.json', verifyToken, (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(swaggerSpec);
 });
@@ -305,8 +310,8 @@ app.post('/api/clientes', async (req, res) => {
             INSERT INTO CLIENTES (
                 NOME_RAZAO, NOME_FANTASIA, TIPO_PESSOA, CPF_CNPJ, IE, 
                 EMAIL, TELEFONE, ENDERECO, NUMERO, COMPLEMENTO, BAIRRO, CEP, 
-                MUNICIPIO, UF, CODIGO_PAIS, DATA_CADASTRO, ATIVO
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'S')
+                MUNICIPIO, UF, CODIGO_PAIS, ATIVO
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'S')
             RETURNING ID_CLIENTE
         `;
         const result = await db.query(query, [
@@ -379,7 +384,9 @@ app.put('/api/clientes/:id', async (req, res) => {
         `;
         // Sanitize all inputs
         await db.query(query, [
-            sanitize(TIPO_PESSOA), sanitize(CODIGO_PAIS) || 1058,
+            sanitize(NOME_RAZAO), sanitize(NOME_FANTASIA), sanitize(TIPO_PESSOA) || 'F', cleanDigits(CPF_CNPJ), sanitize(IE),
+            sanitize(EMAIL), cleanDigits(TELEFONE), sanitize(ENDERECO), sanitize(NUMERO), sanitize(COMPLEMENTO), sanitize(BAIRRO), cleanDigits(CEP),
+            sanitize(MUNICIPIO), sanitize(UF), sanitize(CODIGO_PAIS) || 1058,
             id
         ]);
         res.json({ success: true });

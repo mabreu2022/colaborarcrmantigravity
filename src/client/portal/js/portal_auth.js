@@ -29,13 +29,14 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
             errorEl.textContent = data.error || 'Credenciais inválidas.';
             errorEl.style.display = 'block';
             btn.disabled = false;
-            btn.innerHTML = '<span>Entrar no Portal</span><i class="btn-icon">→</i>';
+            btn.innerHTML = '<span>Entrar no Portal</span><i class="btn-icon">&rarr;</i>';
         }
     } catch (error) {
         console.error('Login error:', error);
         errorEl.textContent = 'Erro de conexão com o servidor.';
         errorEl.style.display = 'block';
         btn.disabled = false;
-        btn.innerHTML = '<span>Entrar no Portal</span><i class="btn-icon">→</i>';
+        btn.innerHTML = '<span>Entrar no Portal</span><i class="btn-icon">&rarr;</i>';
     }
 });
+
