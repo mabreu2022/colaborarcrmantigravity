@@ -6,6 +6,16 @@ require('dotenv').config();
 const fs = require('fs'); // Added for .env writing
 const nodemailer = require(path.join(__dirname, 'node_modules', 'nodemailer'));
 
+// ── Segurança: Autenticação JWT e Sanitização XSS ───────────────────────────
+const { verifyToken, generateToken } = require('./authMiddleware');
+const xss = require('xss');
+const sanitizeHtml = (val) => {
+    if (val === undefined || val === null) return null;
+    if (typeof val === 'string') return xss(val.trim());
+    return val;
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ── LGPD: Auditoria de Acessos e Anonimização ───────────────────────────────
 const { auditarAcessoPII, auditarRotasSensiveis } = require('./lgpd/audit_middleware');
 const { anonimizarClienteViaSP } = require('./lgpd/anonymization');
@@ -33,6 +43,10 @@ app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
     next();
 });
+
+// Autenticação Global para as rotas da API
+// (verifyToken já permite o bypass para as rotas de login e ambiente local por compatibilidade)
+app.use('/api', verifyToken);
 
 // Serve static files from client folder
 const clientPath = path.join(__dirname, '../client');
@@ -233,23 +247,35 @@ app.get('/api/clientes', async (req, res) => {
  *         description: Client created successfully.
  */
 app.post('/api/clientes', async (req, res) => {
+    
+    // Mitigação Stored XSS e sanitização original
+    let { 
+        NOME_RAZAO, NOME_FANTASIA, TIPO_PESSOA, CPF_CNPJ, IE, EMAIL, TELEFONE, 
+        ENDERECO, NUMERO, COMPLEMENTO, BAIRRO, CEP, MUNICIPIO, UF, CODIGO_PAIS 
+    } = req.body;
 
-    let { NOME_RAZAO, NOME_FANTASIA, CPF_CNPJ, IE, EMAIL, TELEFONE, ENDERECO, NUMERO, COMPLEMENTO, BAIRRO, CEP, MUNICIPIO, UF, TIPO_PESSOA, CODIGO_PAIS } = req.body;
+    // Apply XSS protection to text fields that could contain scripts
+    NOME_RAZAO = sanitizeHtml(NOME_RAZAO);
+    NOME_FANTASIA = sanitizeHtml(NOME_FANTASIA);
+    EMAIL = sanitizeHtml(EMAIL);
+    ENDERECO = sanitizeHtml(ENDERECO);
+    COMPLEMENTO = sanitizeHtml(COMPLEMENTO);
+    BAIRRO = sanitizeHtml(BAIRRO);
 
     try {
         const query = `
             INSERT INTO CLIENTES (
-                NOME_RAZAO, NOME_FANTASIA, CPF_CNPJ, IE, EMAIL, TELEFONE, 
-                ENDERECO, NUMERO, COMPLEMENTO, BAIRRO, CEP, MUNICIPIO, UF, 
-                TIPO_PESSOA, CODIGO_PAIS, DATA_MODIFICACAO, ATIVO
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'S')
+                NOME_RAZAO, NOME_FANTASIA, TIPO_PESSOA, CPF_CNPJ, IE, 
+                EMAIL, TELEFONE, ENDERECO, NUMERO, COMPLEMENTO, BAIRRO, CEP, 
+                MUNICIPIO, UF, CODIGO_PAIS, DATA_CADASTRO, ATIVO
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'S')
             RETURNING ID_CLIENTE
         `;
         const result = await db.query(query, [
-            sanitize(NOME_RAZAO), sanitize(NOME_FANTASIA), cleanDigits(CPF_CNPJ), sanitize(IE), sanitize(EMAIL), cleanDigits(TELEFONE),
-            sanitize(ENDERECO), sanitize(NUMERO), sanitize(COMPLEMENTO), sanitize(BAIRRO), cleanDigits(CEP), sanitize(MUNICIPIO), sanitize(UF),
-            sanitize(TIPO_PESSOA) || 'F',
+            sanitize(NOME_RAZAO), sanitize(NOME_FANTASIA), sanitize(TIPO_PESSOA) || 'F', cleanDigits(CPF_CNPJ), sanitize(IE), 
+            sanitize(EMAIL), cleanDigits(TELEFONE), 
+            sanitize(ENDERECO), sanitize(NUMERO), sanitize(COMPLEMENTO), sanitize(BAIRRO), cleanDigits(CEP), 
+            sanitize(MUNICIPIO), sanitize(UF), 
             sanitize(CODIGO_PAIS) || 1058 // Default Brazil if missing
         ]);
         res.json({ success: true, id: result.ID_CLIENTE });
@@ -282,25 +308,39 @@ app.post('/api/clientes', async (req, res) => {
  *         description: Client updated successfully.
  */
 app.put('/api/clientes/:id', async (req, res) => {
-
+    
     const { id } = req.params;
-    let { NOME_RAZAO, NOME_FANTASIA, CPF_CNPJ, IE, EMAIL, TELEFONE, ENDERECO, NUMERO, COMPLEMENTO, BAIRRO, CEP, MUNICIPIO, UF, TIPO_PESSOA, CODIGO_PAIS } = req.body;
 
-    console.log(`PUT /api/clientes/${id} Payload:`, req.body); // Debug
+    // IDOR Check
+    if (req.user && req.user.PERFIL !== 'ADMIN') {
+        if (req.user.cliente_id && req.user.cliente_id != id) {
+            return res.status(403).json({ error: "Acesso negado. Apenas o administrador ou o próprio cliente pode editar estes dados." });
+        }
+    }
+
+    let { 
+        NOME_RAZAO, NOME_FANTASIA, TIPO_PESSOA, CPF_CNPJ, IE, EMAIL, TELEFONE, 
+        ENDERECO, NUMERO, COMPLEMENTO, BAIRRO, CEP, MUNICIPIO, UF, CODIGO_PAIS 
+    } = req.body;
+
+    // Apply XSS protection to text fields
+    NOME_RAZAO = sanitizeHtml(NOME_RAZAO);
+    NOME_FANTASIA = sanitizeHtml(NOME_FANTASIA);
+    EMAIL = sanitizeHtml(EMAIL);
+    ENDERECO = sanitizeHtml(ENDERECO);
+    COMPLEMENTO = sanitizeHtml(COMPLEMENTO);
+    BAIRRO = sanitizeHtml(BAIRRO);
 
     try {
         const query = `
-            UPDATE CLIENTES 
-            SET NOME_RAZAO=?, NOME_FANTASIA=?, CPF_CNPJ=?, IE=?, EMAIL=?, TELEFONE=?, 
-                ENDERECO=?, NUMERO=?, COMPLEMENTO=?, BAIRRO=?, CEP=?, MUNICIPIO=?, UF=?, 
-                TIPO_PESSOA=?, CODIGO_PAIS=?, DATA_MODIFICACAO=CURRENT_TIMESTAMP
-            WHERE ID_CLIENTE = ?
+            UPDATE CLIENTES SET 
+                NOME_RAZAO=?, NOME_FANTASIA=?, TIPO_PESSOA=?, CPF_CNPJ=?, IE=?, 
+                EMAIL=?, TELEFONE=?, ENDERECO=?, NUMERO=?, COMPLEMENTO=?, BAIRRO=?, CEP=?, 
+                MUNICIPIO=?, UF=?, CODIGO_PAIS=?, DATA_MODIFICACAO=CURRENT_TIMESTAMP
+            WHERE ID_CLIENTE=?
         `;
-
         // Sanitize all inputs
         await db.query(query, [
-            sanitize(NOME_RAZAO), sanitize(NOME_FANTASIA), cleanDigits(CPF_CNPJ), sanitize(IE), sanitize(EMAIL), cleanDigits(TELEFONE),
-            sanitize(ENDERECO), sanitize(NUMERO), sanitize(COMPLEMENTO), sanitize(BAIRRO), cleanDigits(CEP), sanitize(MUNICIPIO), sanitize(UF),
             sanitize(TIPO_PESSOA), sanitize(CODIGO_PAIS) || 1058,
             id
         ]);
@@ -562,7 +602,19 @@ app.get('/api/clientes/:id/contatos', async (req, res) => {
  */
 app.post('/api/contatos', async (req, res) => {
 
-    const { ID_CLIENTE, NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO, SENHA } = req.body;
+    let { ID_CLIENTE, NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO, SENHA } = req.body;
+    
+    // Mitigação IDOR: Forçar o ID_CLIENTE se não for Admin
+    if (req.user && req.user.PERFIL !== 'ADMIN') {
+        ID_CLIENTE = req.user.cliente_id || ID_CLIENTE;
+    }
+
+    // Mitigação Stored XSS
+    NOME_CONTATO = sanitizeHtml(NOME_CONTATO);
+    EMAIL_CONTATO = sanitizeHtml(EMAIL_CONTATO);
+    CARGO = sanitizeHtml(CARGO);
+    OBSERVACAO = sanitizeHtml(OBSERVACAO);
+
     try {
         if (EMAIL_CONTATO && EMAIL_CONTATO.trim() !== '') {
             const checkQuery = `
@@ -617,8 +669,27 @@ app.post('/api/contatos', async (req, res) => {
 app.put('/api/contatos/:id', async (req, res) => {
 
     const { id } = req.params;
-    const { NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO, SENHA } = req.body;
+    let { NOME_CONTATO, TELEFONE_CONTATO, EMAIL_CONTATO, CARGO, OBSERVACAO, TIPO_CONTATO, SENHA } = req.body;
+    
     try {
+        // IDOR Check
+        if (req.user && req.user.PERFIL !== 'ADMIN') {
+            const checkQuery = `SELECT ID_CLIENTE FROM CONTATOS WHERE ID_CONTATO = ?`;
+            const contatoAtual = await db.query(checkQuery, [id]);
+            if (!contatoAtual || contatoAtual.length === 0) {
+                return res.status(404).json({ error: "Contato não encontrado." });
+            }
+            if (contatoAtual[0].ID_CLIENTE != req.user.cliente_id) {
+                return res.status(403).json({ error: "Acesso negado. Não tem permissões para editar este contato." });
+            }
+        }
+
+        // Mitigação Stored XSS
+        NOME_CONTATO = sanitizeHtml(NOME_CONTATO);
+        EMAIL_CONTATO = sanitizeHtml(EMAIL_CONTATO);
+        CARGO = sanitizeHtml(CARGO);
+        OBSERVACAO = sanitizeHtml(OBSERVACAO);
+
         if (EMAIL_CONTATO && EMAIL_CONTATO.trim() !== '') {
             const checkQuery = `
                 SELECT C.ID_CONTATO 
@@ -776,7 +847,18 @@ app.get('/api/contratos', async (req, res) => {
  */
 app.post('/api/contratos', async (req, res) => {
 
-    const { ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, SLAID, DESCRICAO, OBSERVACOES } = req.body;
+    const { DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, SLAID, DESCRICAO, OBSERVACOES } = req.body;
+    
+    // Mitigação de IDOR: Forçar o ID_CLIENTE para o ID do utilizador autenticado se não for ADMIN
+    let ID_CLIENTE = req.body.ID_CLIENTE;
+    if (req.user && req.user.PERFIL !== 'ADMIN') {
+        ID_CLIENTE = req.user.cliente_id || ID_CLIENTE; 
+    }
+
+    // Mitigação Stored XSS: Sanitização forçada em campos de texto livre
+    const descSegura = sanitizeHtml(DESCRICAO);
+    const obsSegura = sanitizeHtml(OBSERVACOES);
+
     console.log("POST /api/contratos Payload:", req.body); // Debug Log
     try {
         const query = `
@@ -784,7 +866,7 @@ app.post('/api/contratos', async (req, res) => {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             RETURNING ID_CONTRATO
         `;
-        const result = await db.query(query, [ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, SLAID || null, DESCRICAO, OBSERVACOES]);
+        const result = await db.query(query, [ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, SLAID || null, descSegura, obsSegura]);
         console.log("Insert Result:", result); // Debug Log
         res.json({ success: true, id: result.ID_CONTRATO });
     } catch (error) {
@@ -817,11 +899,33 @@ app.post('/api/contratos', async (req, res) => {
  */
 app.put('/api/contratos/:id', async (req, res) => {
     const { id } = req.params;
-    const { ID_CLIENTE, DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, SLAID, DESCRICAO, OBSERVACOES } = req.body;
+    const { DATA_INICIO, DATA_FIM, VALOR_MENSAL, ID_STATUS, SLAID, DESCRICAO, OBSERVACOES } = req.body;
 
     console.log(`[DEBUG] PUT /api/contratos/${id} - Payload:`, req.body);
 
     try {
+        // Mitigação IDOR: Verificar se o utilizador pode editar este contrato
+        if (req.user && req.user.PERFIL !== 'ADMIN') {
+            const checkQuery = `SELECT ID_CLIENTE FROM CONTRATOS WHERE ID_CONTRATO = ?`;
+            const contratoAtual = await db.query(checkQuery, [id]);
+            if (!contratoAtual || contratoAtual.length === 0) {
+                return res.status(404).json({ error: "Contrato não encontrado." });
+            }
+            if (contratoAtual[0].ID_CLIENTE != req.user.cliente_id) {
+                return res.status(403).json({ error: "Acesso negado. Não tem permissões para editar este contrato." });
+            }
+        }
+
+        // Mitigação de IDOR: Forçar o ID_CLIENTE para o ID do utilizador autenticado se não for ADMIN
+        let ID_CLIENTE = req.body.ID_CLIENTE;
+        if (req.user && req.user.PERFIL !== 'ADMIN') {
+            ID_CLIENTE = req.user.cliente_id || ID_CLIENTE; 
+        }
+
+        // Mitigação Stored XSS
+        const descSegura = sanitizeHtml(DESCRICAO);
+        const obsSegura = sanitizeHtml(OBSERVACOES);
+
         const query = `
             UPDATE CONTRATOS 
             SET ID_CLIENTE = ?, DATA_INICIO = ?, DATA_FIM = ?, VALOR_MENSAL = ?, ID_STATUS = ?, SLAID = ?, DESCRICAO = ?, OBSERVACOES = ?
@@ -835,8 +939,8 @@ app.put('/api/contratos/:id', async (req, res) => {
             VALOR_MENSAL || 0,
             ID_STATUS || null,
             SLAID || null,
-            DESCRICAO || null,
-            OBSERVACOES || null,
+            descSegura || null,
+            obsSegura || null,
             id
         ];
 
@@ -1421,7 +1525,11 @@ app.post("/api/login", async (req, res) => {
             const user = result[0];
             // Don't send password back
             delete user.SENHA;
-            res.json({ success: true, user });
+            
+            // Gerar token JWT
+            const token = generateToken(user);
+            
+            res.json({ success: true, user, token });
         } else {
             res.status(401).json({ success: false, message: "Credenciais inválidas" });
         }
@@ -1445,7 +1553,11 @@ app.post("/api/portal/login", async (req, res) => {
         if (result.length > 0) {
             const user = result[0];
             delete user.SENHA;
-            res.json({ success: true, user });
+            
+            // Gerar token JWT
+            const token = generateToken(user);
+            
+            res.json({ success: true, user, token });
         } else {
             res
                 .status(401)

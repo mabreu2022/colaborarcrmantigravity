@@ -21,6 +21,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
 
         if (data.success) {
             localStorage.setItem('user', JSON.stringify(data.user));
+            if (data.token) localStorage.setItem('token', data.token); // Guardar o Token JWT
             window.location.href = 'index.html';
         } else {
             errorMsg.textContent = data.message || 'Erro ao fazer login';

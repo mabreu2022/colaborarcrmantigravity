@@ -1,3 +1,29 @@
+// --- Autenticação JWT Interceptor (Portal) ---
+const originalPortalFetch = window.fetch;
+window.fetch = async function () {
+  let [resource, config] = arguments;
+  
+  const token = localStorage.getItem('portalToken');
+  if (token && resource && resource.toString().includes('api/')) {
+    if (!config) config = {};
+    if (!config.headers) config.headers = {};
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  const response = await originalPortalFetch(resource, config);
+  
+  if (response.status === 401 || response.status === 403) {
+      const errorData = await response.json().catch(() => ({}));
+      if (errorData.error === "Token inválido ou expirado." || errorData.error === "Token não fornecido. Acesso negado.") {
+          localStorage.removeItem('portalUser');
+          localStorage.removeItem('portalToken');
+          window.location.href = 'login.html';
+      }
+  }
+  return response;
+};
+// -----------------------------------
+
 class PortalManager {
     constructor() {
         this.user = JSON.parse(localStorage.getItem('portalUser'));

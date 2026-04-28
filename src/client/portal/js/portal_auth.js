@@ -22,6 +22,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         if (data.success) {
             // Store portal session
             localStorage.setItem('portalUser', JSON.stringify(data.user));
+            if (data.token) localStorage.setItem('portalToken', data.token);
             // Redirect to portal home
             window.location.href = 'index.html';
         } else {
