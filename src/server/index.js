@@ -22,6 +22,44 @@ const { anonimizarClienteViaSP } = require('./lgpd/anonymization');
 // ─────────────────────────────────────────────────────────────────────────────
 
 const app = express();
+const helmet = require('helmet');
+
+// Remove the X-Powered-By header explicitly (Helmet also does this, but good practice)
+app.disable('x-powered-by');
+
+// Add HTTP Security Headers
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://code.jquery.com", "https://unpkg.com"],
+            scriptSrcAttr: ["'unsafe-inline'"], // Permite onclick="..." no HTML
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://unpkg.com"],
+            imgSrc: ["'self'", "data:", "blob:", "https:"],
+            connectSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://unpkg.com"], // Permite Source Maps dos CDNs
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            objectSrc: ["'none'"],
+            upgradeInsecureRequests: [],
+        },
+    },
+    crossOriginEmbedderPolicy: false,
+    strictTransportSecurity: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true
+    },
+    xFrameOptions: { action: 'sameorigin' },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    xContentTypeOptions: true,
+    xXssProtection: true
+}));
+
+// Permissions-Policy Header
+app.use((req, res, next) => {
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    next();
+});
+
 const port = process.env.PORT || 3000;
 
 app.use(cors());
