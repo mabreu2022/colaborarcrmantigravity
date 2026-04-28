@@ -1370,6 +1370,79 @@
         </div>
     </div>
 
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         Modal: Confirmação de Exclusão em Cascata de Cliente
+         ══════════════════════════════════════════════════════════════════ -->
+    <div id="deleteClientModal" class="modal-overlay" style="z-index: 1500;">
+        <div class="modal-window" style="max-width: 520px;">
+
+            <!-- Header com ícone de perigo -->
+            <div class="modal-header" style="background: linear-gradient(135deg, #7f1d1d, #b91c1c); border-radius: 12px 12px 0 0; padding: 20px 24px;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div style="width: 44px; height: 44px; background: rgba(255,255,255,0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">
+                        ⚠️
+                    </div>
+                    <div>
+                        <h3 style="margin: 0; color: #fff; font-size: 1.1rem;">Excluir Cliente</h3>
+                        <p id="deleteClientName" style="margin: 2px 0 0; color: rgba(255,255,255,0.75); font-size: 0.85rem; font-weight: 400;"></p>
+                    </div>
+                </div>
+                <button class="modal-close" onclick="appManager.closeModal('deleteClientModal')" style="color: rgba(255,255,255,0.8);">&times;</button>
+            </div>
+
+            <div class="modal-body" style="padding: 24px;">
+                <input type="hidden" id="deleteClientId">
+
+                <!-- Aviso principal -->
+                <div style="background: rgba(185,28,28,0.08); border: 1px solid rgba(185,28,28,0.25); border-radius: 8px; padding: 14px 16px; margin-bottom: 20px;">
+                    <p style="margin: 0 0 4px; font-weight: 600; color: #dc2626; font-size: 0.9rem;">
+                        ⚠️ Esta ação não pode ser desfeita!
+                    </p>
+                    <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">
+                        Os dados abaixo serão <strong>desativados em cascata</strong> e não aparecerão mais no sistema:
+                    </p>
+                </div>
+
+                <!-- Lista de dependências -->
+                <div style="background: var(--surface-color, rgba(255,255,255,0.04)); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                    <p style="margin: 0 0 10px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">
+                        Dados afetados
+                    </p>
+                    <ul id="deleteClientDepsList" style="margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 8px;">
+                        <!-- Preenchido via JS -->
+                    </ul>
+                    <div id="deleteClientNoDepMsg" style="display:none; font-size: 0.875rem; color: var(--text-secondary);">
+                        ✅ Nenhuma dependência encontrada. O cliente será excluído com segurança.
+                    </div>
+                </div>
+
+                <!-- Checkbox de confirmação -->
+                <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; background: rgba(250,204,21,0.06); border: 1px solid rgba(250,204,21,0.25); border-radius: 8px; padding: 12px 14px;">
+                    <input type="checkbox" id="deleteClientConfirmCheck"
+                        onchange="appManager.onDeleteClientCheckChange()"
+                        style="margin-top: 2px; width: 16px; height: 16px; flex-shrink: 0; accent-color: #dc2626; cursor: pointer;">
+                    <span style="font-size: 0.875rem; line-height: 1.4; color: var(--text-primary);">
+                        Confirmo que desejo excluir este cliente e todos os seus dados relacionados em cascata.
+                    </span>
+                </label>
+            </div>
+
+            <div class="modal-footer" style="gap: 10px;">
+                <button class="btn-secondary" onclick="appManager.closeModal('deleteClientModal')">
+                    Cancelar
+                </button>
+                <button id="deleteClientConfirmBtn"
+                    onclick="appManager.confirmDeleteClient()"
+                    disabled
+                    style="background: linear-gradient(135deg, #b91c1c, #dc2626); color: white; border: none; padding: 10px 22px; border-radius: 8px; font-weight: 600; cursor: not-allowed; opacity: 0.5; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
+                    <span id="deleteClientBtnIcon">🗑️</span>
+                    <span id="deleteClientBtnText">Excluir Tudo</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="js/estoque.js?v=2"></script>
     <script type="module" src="js/app.js?v=14"></script>
 </body>

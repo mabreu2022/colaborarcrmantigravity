@@ -327,13 +327,126 @@ app.put('/api/clientes/:id', async (req, res) => {
  *       200:
  *         description: Client deleted successfully.
  */
-app.delete('/api/clientes/:id', async (req, res) => {
-
+/**
+ * GET /api/clientes/:id/dependencias
+ * Returns a summary of all data that would be affected by deleting a client.
+ * Used by the frontend to show a detailed confirmation dialog.
+ */
+app.get('/api/clientes/:id/dependencias', async (req, res) => {
     const { id } = req.params;
     try {
-        await db.query("UPDATE CLIENTES SET ATIVO = 'N' WHERE ID_CLIENTE = ?", [id]);
+        const [contratos, chamadosAbertos, contatos, ativos, ativosColaborar] = await Promise.all([
+            db.query('SELECT COUNT(*) as QTD FROM CONTRATOS WHERE ID_CLIENTE = ? AND ID_STATUS = 1', [id]),
+            db.query(`
+                SELECT COUNT(*) as QTD FROM CHAMADOS C
+                JOIN STATUS_CHAMADO S ON C.ID_STATUS_CHAMADO = S.ID_STATUS_CHAMADO
+                WHERE C.CODCLIENTE = ? AND TRIM(S.ENCERRA) = 'N'
+            `, [id]),
+            db.query(`SELECT COUNT(*) as QTD FROM CONTATOS WHERE ID_CLIENTE = ? AND (ATIVO = 'S' OR ATIVO = 'T')`, [id]),
+            db.query(`
+                SELECT COUNT(*) as QTD FROM ATIVOS A
+                JOIN ATIVOS_CONTRATOS AC ON A.ID_ATIVO = AC.ID_ATIVO
+                JOIN CONTRATOS C ON AC.ID_CONTRATO = C.ID_CONTRATO
+                WHERE C.ID_CLIENTE = ? AND A.ID_STATUS <> 5
+            `, [id]),
+            db.query(`
+                SELECT COUNT(*) as QTD FROM ATIVOS A
+                JOIN ATIVOS_CONTRATOS AC ON A.ID_ATIVO = AC.ID_ATIVO
+                JOIN CONTRATOS C ON AC.ID_CONTRATO = C.ID_CONTRATO
+                WHERE C.ID_CLIENTE = ? AND A.ID_STATUS <> 5 AND A.ID_PRODUTO IS NOT NULL
+            `, [id])
+        ]);
+
+        res.json({
+            contratos:       Number(contratos[0]?.QTD       || 0),
+            chamadosAbertos: Number(chamadosAbertos[0]?.QTD || 0),
+            contatos:        Number(contatos[0]?.QTD        || 0),
+            ativos:          Number(ativos[0]?.QTD          || 0),
+            ativosColaborar: Number(ativosColaborar[0]?.QTD || 0)
+        });
+    } catch (error) {
+        console.error(`[DEPS] Error checking dependencies for client ${id}:`, error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * DELETE /api/clientes/:id
+ * Cascade soft-delete: deactivates contracts, returns Colaborar assets to stock,
+ * deactivates third-party assets, closes open tickets, deactivates contacts,
+ * and finally marks the client as inactive.
+ */
+app.delete('/api/clientes/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        console.log(`[CASCADE DELETE] Starting cascade delete for client ID=${id}`);
+
+        // ── 1. Contracts ──────────────────────────────────────────────────────
+        const contratos = await db.query(
+            'SELECT ID_CONTRATO FROM CONTRATOS WHERE ID_CLIENTE = ? AND ID_STATUS = 1',
+            [id]
+        );
+        console.log(`[CASCADE DELETE] Found ${contratos.length} active contract(s)`);
+
+        for (const contrato of contratos) {
+            // ── 2. Assets linked to this contract ─────────────────────────────
+            const ativos = await db.query(`
+                SELECT A.ID_ATIVO, A.ID_PRODUTO
+                FROM ATIVOS A
+                JOIN ATIVOS_CONTRATOS AC ON A.ID_ATIVO = AC.ID_ATIVO
+                WHERE AC.ID_CONTRATO = ? AND A.ID_STATUS <> 5
+            `, [contrato.ID_CONTRATO]);
+
+            for (const ativo of ativos) {
+                if (ativo.ID_PRODUTO) {
+                    // ── Colaborar asset: return to stock ──────────────────────
+                    console.log(`[CASCADE DELETE] Returning asset ID=${ativo.ID_ATIVO} to stock (has product ID=${ativo.ID_PRODUTO})`);
+                    await syncAssetToInventory(ativo.ID_ATIVO, 2);
+                } else {
+                    // ── Third-party asset: deactivate ─────────────────────────
+                    console.log(`[CASCADE DELETE] Deactivating third-party asset ID=${ativo.ID_ATIVO}`);
+                    await db.query('UPDATE ATIVOS SET ID_STATUS = 5 WHERE ID_ATIVO = ?', [ativo.ID_ATIVO]);
+                    await db.query('DELETE FROM ATIVOS_CONTRATOS WHERE ID_ATIVO = ?', [ativo.ID_ATIVO]);
+                }
+            }
+
+            // ── 3. Deactivate contract ─────────────────────────────────────────
+            await db.query('UPDATE CONTRATOS SET ID_STATUS = 2 WHERE ID_CONTRATO = ?', [contrato.ID_CONTRATO]);
+            console.log(`[CASCADE DELETE] Contract ID=${contrato.ID_CONTRATO} deactivated`);
+        }
+
+        // ── 4. Close open tickets ──────────────────────────────────────────────
+        const closedStatus = await db.query(
+            "SELECT FIRST 1 ID_STATUS_CHAMADO FROM STATUS_CHAMADO WHERE TRIM(ENCERRA) = 'S' ORDER BY ID_STATUS_CHAMADO"
+        );
+        if (closedStatus.length > 0) {
+            const idStatusClosed = closedStatus[0].ID_STATUS_CHAMADO;
+            const ticketsUpdated = await db.query(`
+                UPDATE CHAMADOS SET
+                    ID_STATUS_CHAMADO = ?,
+                    DATA_FECHAMENTO = CURRENT_TIMESTAMP,
+                    DATA_MODIFICACAO = CURRENT_TIMESTAMP
+                WHERE CODCLIENTE = ?
+                  AND ID_STATUS_CHAMADO IN (
+                      SELECT ID_STATUS_CHAMADO FROM STATUS_CHAMADO WHERE TRIM(ENCERRA) = 'N'
+                  )
+            `, [idStatusClosed, id]);
+            console.log(`[CASCADE DELETE] Open tickets closed with status ID=${idStatusClosed}`);
+        } else {
+            console.warn(`[CASCADE DELETE] No 'closed' status found in STATUS_CHAMADO — tickets left unchanged`);
+        }
+
+        // ── 5. Deactivate contacts ─────────────────────────────────────────────
+        await db.query("UPDATE CONTATOS SET ATIVO = 'N' WHERE ID_CLIENTE = ?", [id]);
+        console.log(`[CASCADE DELETE] Contacts of client ID=${id} deactivated`);
+
+        // ── 6. Soft-delete the client ──────────────────────────────────────────
+        await db.query("UPDATE CLIENTES SET ATIVO = 'N', DATA_MODIFICACAO = CURRENT_TIMESTAMP WHERE ID_CLIENTE = ?", [id]);
+        console.log(`[CASCADE DELETE] Client ID=${id} soft-deleted successfully`);
+
         res.json({ success: true });
     } catch (error) {
+        console.error(`[CASCADE DELETE] Error deleting client ${id}:`, error);
         res.status(500).json({ error: error.message });
     }
 });

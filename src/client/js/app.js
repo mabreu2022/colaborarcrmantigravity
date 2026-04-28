@@ -3475,18 +3475,141 @@ class AppManager {
   }
 
   async deleteClient(id) {
-    if (!confirm("Tem certeza que deseja excluir este cliente?")) return;
+    // ── Step 1: Get client name from the already-loaded cache ──────────────
+    let clientName = '';
+    if (this.clientsData && Array.isArray(this.clientsData)) {
+      const found = this.clientsData.find(c => String(c.ID_CLIENTE) === String(id));
+      if (found) clientName = found.NOME_RAZAO || '';
+    }
+
+    // ── Step 2: Fetch dependency counts ────────────────────────────────────
+    try {
+      const res = await fetch(`api/clientes/${id}/dependencias`);
+      if (!res.ok) throw new Error('Erro ao verificar dependências');
+      const deps = await res.json();
+      this.showDeleteClientModal(id, clientName, deps);
+    } catch (error) {
+      console.error('[deleteClient]', error);
+      alert('Erro ao verificar dependências do cliente: ' + error.message);
+    }
+  }
+
+  showDeleteClientModal(id, clientName, deps) {
+    // Populate hidden ID + title
+    document.getElementById('deleteClientId').value = id;
+    document.getElementById('deleteClientName').textContent = clientName
+      ? `"${clientName}"`
+      : `ID ${id}`;
+
+    // Build dependency list items
+    const list = document.getElementById('deleteClientDepsList');
+    const noDep = document.getElementById('deleteClientNoDepMsg');
+    list.innerHTML = '';
+
+    const hasDeps =
+      deps.contratos > 0 ||
+      deps.ativos > 0 ||
+      deps.chamadosAbertos > 0 ||
+      deps.contatos > 0;
+
+    if (!hasDeps) {
+      list.style.display = 'none';
+      noDep.style.display = 'block';
+    } else {
+      list.style.display = 'flex';
+      noDep.style.display = 'none';
+
+      const item = (icon, label) => {
+        const li = document.createElement('li');
+        li.style.cssText =
+          'display:flex;align-items:center;gap:10px;font-size:0.875rem;' +
+          'background:rgba(255,255,255,0.03);border:1px solid var(--border-color);' +
+          'border-radius:6px;padding:8px 12px;';
+        li.innerHTML = `<span style="font-size:1.1rem;flex-shrink:0">${icon}</span><span>${label}</span>`;
+        return li;
+      };
+
+      if (deps.contratos > 0) {
+        list.appendChild(
+          item('📄', `<strong>${deps.contratos}</strong> contrato(s) ativo(s) → serão <em>desativados</em>`)
+        );
+      }
+      if (deps.ativos > 0) {
+        let ativoLabel = `<strong>${deps.ativos}</strong> ativo(s) vinculado(s) ao(s) contrato(s)`;
+        if (deps.ativosColaborar > 0) {
+          ativoLabel += ` — <strong style="color:#22c55e">${deps.ativosColaborar} da Colaborar</strong> voltarão ao estoque`;
+        }
+        if (deps.ativos - deps.ativosColaborar > 0) {
+          ativoLabel += ` — <strong>${deps.ativos - deps.ativosColaborar} de terceiros</strong> serão desativados`;
+        }
+        list.appendChild(item('📦', ativoLabel));
+      }
+      if (deps.chamadosAbertos > 0) {
+        list.appendChild(
+          item('🎫', `<strong>${deps.chamadosAbertos}</strong> chamado(s) em aberto → serão <em>encerrados</em>`)
+        );
+      }
+      if (deps.contatos > 0) {
+        list.appendChild(
+          item('👤', `<strong>${deps.contatos}</strong> contato(s) → serão <em>desativados</em>`)
+        );
+      }
+    }
+
+    // Reset checkbox & button
+    const check = document.getElementById('deleteClientConfirmCheck');
+    const btn = document.getElementById('deleteClientConfirmBtn');
+    check.checked = false;
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'not-allowed';
+    document.getElementById('deleteClientBtnText').textContent = 'Excluir Tudo';
+    document.getElementById('deleteClientBtnIcon').textContent = '🗑️';
+
+    // Open modal
+    document.getElementById('deleteClientModal').classList.add('active');
+  }
+
+  onDeleteClientCheckChange() {
+    const checked = document.getElementById('deleteClientConfirmCheck').checked;
+    const btn = document.getElementById('deleteClientConfirmBtn');
+    btn.disabled = !checked;
+    btn.style.opacity = checked ? '1' : '0.5';
+    btn.style.cursor = checked ? 'pointer' : 'not-allowed';
+  }
+
+  async confirmDeleteClient() {
+    const id = document.getElementById('deleteClientId').value;
+    const btn = document.getElementById('deleteClientConfirmBtn');
+
+    // Show loading state
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+    btn.style.cursor = 'not-allowed';
+    document.getElementById('deleteClientBtnIcon').textContent = '⏳';
+    document.getElementById('deleteClientBtnText').textContent = 'Excluindo...';
 
     try {
-      const response = await fetch(`api/clientes/${id}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(`api/clientes/${id}`, { method: 'DELETE' });
+      const result = await response.json();
 
-      if (!response.ok) throw new Error("Erro ao excluir");
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Erro ao excluir cliente');
+      }
+
+      // Success
+      this.closeModal('deleteClientModal');
       this.loadClients();
     } catch (error) {
-      console.error(error);
-      alert("Erro ao excluir cliente: " + error.message);
+      console.error('[confirmDeleteClient]', error);
+      alert('Erro ao excluir cliente: ' + error.message);
+
+      // Restore button
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+      document.getElementById('deleteClientBtnIcon').textContent = '🗑️';
+      document.getElementById('deleteClientBtnText').textContent = 'Excluir Tudo';
     }
   }
   // --- AGENDA MODULE ---
