@@ -3,7 +3,11 @@ const jwt = require('jsonwebtoken');
 function verifyToken(req, res, next) {
     // Permitir acesso sem token se estivermos em modo de desenvolvimento ou se a rota for pública
     // Em produção real, este bypass deve ser removido
-    if (process.env.NODE_ENV === 'development' || req.originalUrl.includes('/api/login') || req.originalUrl.includes('/api/portal/login')) {
+    if (process.env.NODE_ENV === 'development' || 
+        req.originalUrl.includes('/api/login') || 
+        req.originalUrl.includes('/api/portal/login') || 
+        req.originalUrl.includes('/api/forgot-password') || 
+        req.originalUrl.includes('/api/reset-password')) {
         return next();
     }
 

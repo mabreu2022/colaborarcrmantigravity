@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
+
 <body class="login-page">
     <div class="login-container">
         <div class="login-card">
@@ -18,7 +20,7 @@
                 </div>
                 <p>Bem-vindo ao seu portal de suporte t&eacute;cnico</p>
             </div>
-            
+
             <form id="loginForm" class="login-form">
                 <div class="form-group">
                     <label for="email">E-mail de Acesso</label>
@@ -27,12 +29,13 @@
                         <input type="email" id="email" placeholder="seu@email.com" required>
                     </div>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="password">Senha</label>
                     <div class="input-wrapper">
                         <i class="icon">&#128274;</i>
-                        <input type="password" id="password" autocomplete="new-password" placeholder="••••••••" required>
+                        <input type="password" id="password" autocomplete="new-password" placeholder="••••••••"
+                            required>
                     </div>
                 </div>
 
@@ -42,17 +45,17 @@
                     </label>
                     <a href="#" class="forgot-password">Esqueceu a senha?</a>
                 </div>
-                
+
                 <button type="submit" class="btn-login">
                     <span>Entrar no Portal</span>
                     <i class="btn-icon">&rarr;</i>
                 </button>
-                
+
                 <div id="loginError" class="login-error" style="display: none;">
                     Credenciais inv&aacute;lidas. Tente novamente.
                 </div>
             </form>
-            
+
             <div class="login-footer">
                 <p>&copy; 2026 Colaborar CRM & Ativos. Todos os direitos reservados.</p>
             </div>
@@ -61,5 +64,5 @@
 
     <script src="js/portal_auth.js"></script>
 </body>
-</html>
 
+</html>

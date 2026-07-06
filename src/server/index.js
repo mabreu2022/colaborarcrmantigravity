@@ -1614,6 +1614,79 @@ app.post("/api/portal/login", async (req, res) => {
     }
 });
 
+// Forgot Password Endpoint
+app.post('/api/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    try {
+        const query = 'SELECT ID_USUARIO FROM USUARIOS WHERE EMAIL = ?';
+        const result = await db.query(query, [email]);
+        if (result.length === 0) {
+            return res.status(404).json({ error: 'Usuário não encontrado' });
+        }
+        const user = result[0];
+
+        const resetToken = Math.floor(100000 + Math.random() * 900000).toString();
+        const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
+        await db.query('UPDATE USUARIOS SET RESET_TOKEN = ?, RESET_TOKEN_EXPIRY = ? WHERE ID_USUARIO = ?',
+            [resetToken, resetTokenExpiry, user.ID_USUARIO]);
+
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST || 'smtp.gmail.com',
+            port: parseInt(process.env.SMTP_PORT) || 587,
+            secure: process.env.SMTP_PORT == 465,
+            auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/"/g, '') : null
+            }
+        });
+
+        const fromEmail = process.env.MAILER_EMAIL || 'mauriciotask205@gmail.com';
+        const mailOptions = {
+            from: `"Colaborar CRM" <${fromEmail}>`,
+            to: email,
+            subject: 'Recuperação de Senha - Colaborar CRM',
+            text: `Seu código de recuperação é: ${resetToken}`,
+            html: `<b>Seu código de recuperação é: ${resetToken}</b>`
+        };
+
+        console.log(`[Email] Tentando enviar e-mail de recuperação para: ${email}`);
+        await transporter.sendMail(mailOptions);
+        console.log(`[Email] E-mail enviado com sucesso para ${email}`);
+
+        res.json({ success: true, message: 'Código enviado para seu e-mail.' });
+    } catch (error) {
+        console.error('Forgot Password error:', error);
+        res.status(500).json({ error: 'Erro ao processar recuperação.' });
+    }
+});
+
+// Reset Password Endpoint
+app.post('/api/reset-password', async (req, res) => {
+    const { email, token, newPassword } = req.body;
+    try {
+        const query = 'SELECT ID_USUARIO, RESET_TOKEN, RESET_TOKEN_EXPIRY FROM USUARIOS WHERE EMAIL = ?';
+        const result = await db.query(query, [email]);
+        if (result.length === 0) {
+            return res.status(404).json({ error: 'Usuário não encontrado' });
+        }
+        const user = result[0];
+
+        if (!user.RESET_TOKEN || user.RESET_TOKEN.trim() !== token.trim() || new Date() > new Date(user.RESET_TOKEN_EXPIRY)) {
+            return res.status(400).json({ error: 'Código inválido ou expirado.' });
+        }
+
+        await db.query('UPDATE USUARIOS SET SENHA = ?, RESET_TOKEN = NULL, RESET_TOKEN_EXPIRY = NULL WHERE ID_USUARIO = ?',
+            [newPassword, user.ID_USUARIO]);
+
+        res.json({ success: true, message: 'Senha atualizada com sucesso.' });
+    } catch (error) {
+        console.error('Reset Password error:', error);
+        res.status(500).json({ error: 'Falha ao redefinir a senha.' });
+    }
+});
+
+
 // Helper to convert BLOB (function/stream) to String
 const processBlob = (blob) => {
     return new Promise((resolve) => {
